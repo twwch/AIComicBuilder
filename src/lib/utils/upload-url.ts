@@ -3,5 +3,11 @@
  * for serving via /api/uploads/[...path].
  */
 export function uploadUrl(filePath: string): string {
-  return `/api/uploads/${filePath.replace(/^\.?\/?uploads\//, "")}`;
+  const normalized = filePath.replace(/\\/g, "/");
+  const match = normalized.match(/(?:^|\/)uploads\/(.+)$/);
+  const relativePath = match
+    ? match[1]
+    : normalized.replace(/^\.?\//, "").replace(/^\/+/, "");
+
+  return `/api/uploads/${relativePath}`;
 }

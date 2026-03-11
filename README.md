@@ -74,6 +74,44 @@ pnpm dev
 
 访问 [http://localhost:3000](http://localhost:3000)
 
+## Docker 部署
+
+项目现在支持直接用 Docker Compose 部署，适合没有本机 `pnpm` / `ffmpeg` 环境的服务器。
+
+### 环境准备
+
+复制 `.env.example` 为 `.env`，至少配置一个文本模型的 API Key：
+
+```bash
+cp .env.example .env
+```
+
+可选调整：
+
+- `APP_PORT`：宿主机暴露端口，默认 `3000`
+- `NEXT_PUBLIC_APP_URL`：对外访问地址
+
+### 启动容器
+
+```bash
+docker compose up -d --build
+```
+
+### 查看状态
+
+```bash
+docker compose ps
+docker logs -f aicomicbuilder
+```
+
+### 停止容器
+
+```bash
+docker compose down
+```
+
+SQLite 数据库会持久化到 `./data/`，生成素材会持久化到 `./uploads/`。
+
 ## 生成流水线
 
 ```
