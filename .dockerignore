@@ -1,0 +1,9 @@
+.git
+.gitignore
+.next
+node_modules
+data
+uploads
+.env
+docs
+images
