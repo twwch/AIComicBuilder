@@ -797,7 +797,7 @@ async function handleVideoAssembleSync(projectId: string) {
 
     await db
       .update(projects)
-      .set({ status: "completed", updatedAt: new Date() })
+      .set({ status: "completed", finalVideoUrl: outputPath, updatedAt: new Date() })
       .where(eq(projects.id, projectId));
 
     console.log(`[VideoAssemble] Completed: ${outputPath}`);

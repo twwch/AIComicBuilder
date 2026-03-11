@@ -126,6 +126,8 @@ src/
 
 ## Demo
 
+https://ladr-1258957911.cos.ap-guangzhou.myqcloud.com/jadeai/demo1.mp4
+
 <video src="https://ladr-1258957911.cos.ap-guangzhou.myqcloud.com/jadeai/demo1.mp4" controls width="100%"></video>
 
 ## License

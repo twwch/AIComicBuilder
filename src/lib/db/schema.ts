@@ -9,6 +9,7 @@ export const projects = sqliteTable("projects", {
   })
     .notNull()
     .default("draft"),
+  finalVideoUrl: text("final_video_url"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),

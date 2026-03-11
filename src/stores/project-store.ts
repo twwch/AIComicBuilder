@@ -32,6 +32,7 @@ interface Project {
   title: string;
   script: string;
   status: string;
+  finalVideoUrl: string | null;
   characters: Character[];
   shots: Shot[];
 }

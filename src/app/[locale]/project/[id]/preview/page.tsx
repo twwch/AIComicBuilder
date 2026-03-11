@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useProjectStore } from "@/stores/project-store";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
@@ -21,7 +21,20 @@ export default function PreviewPage() {
   const { project, fetchProject } = useProjectStore();
   const [assembling, setAssembling] = useState(false);
   const [selectedShot, setSelectedShot] = useState(0);
-  const [finalVideoPath, setFinalVideoPath] = useState<string | null>(null);
+  const [videoValid, setVideoValid] = useState<boolean | null>(null);
+  const checkedUrl = useRef<string | null>(null);
+
+  const finalVideoUrl = project?.finalVideoUrl ?? null;
+
+  // Check if final video file actually exists
+  useEffect(() => {
+    if (!finalVideoUrl) { setVideoValid(null); return; }
+    if (checkedUrl.current === finalVideoUrl) return;
+    checkedUrl.current = finalVideoUrl;
+    fetch(uploadUrl(finalVideoUrl), { method: "HEAD" })
+      .then((res) => setVideoValid(res.ok))
+      .catch(() => setVideoValid(false));
+  }, [finalVideoUrl]);
 
   if (!project) return null;
 
@@ -29,31 +42,30 @@ export default function PreviewPage() {
   const allShotsHaveVideo = project.shots.every((s) => s.videoUrl);
   const completedVideos = shotsWithVideo.length;
   const currentShot = shotsWithVideo[selectedShot];
+  const hasValidVideo = finalVideoUrl && videoValid === true;
 
   async function handleAssemble() {
     if (!project) return;
     setAssembling(true);
+    checkedUrl.current = null; // reset so next check re-validates
     try {
       const res = await fetch(`/api/projects/${project.id}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "video_assemble" }),
       });
-      const data = await res.json();
-      if (data.outputPath) {
-        setFinalVideoPath(data.outputPath);
-      }
+      await res.json();
     } catch (err) {
       console.error("Video assemble error:", err);
     }
     setAssembling(false);
-    fetchProject(project.id);
+    await fetchProject(project.id);
   }
 
   function handleDownload() {
-    if (!finalVideoPath) return;
+    if (!hasValidVideo) return;
     const a = document.createElement("a");
-    a.href = uploadUrl(finalVideoPath);
+    a.href = uploadUrl(finalVideoUrl!);
     a.download = `${project!.title || "video"}-final.mp4`;
     a.click();
   }
@@ -79,6 +91,12 @@ export default function PreviewPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {hasValidVideo && (
+            <Button onClick={handleDownload} size="sm" variant="outline" className="border-emerald-300 text-emerald-700 hover:bg-emerald-100">
+              <Download className="h-3.5 w-3.5" />
+              {t("project.downloadVideo")}
+            </Button>
+          )}
           <Button
             onClick={handleAssemble}
             disabled={!allShotsHaveVideo || assembling}
@@ -94,14 +112,33 @@ export default function PreviewPage() {
         </div>
       </div>
 
-      {/* Player */}
+      {/* Final video player */}
+      {hasValidVideo && (
+        <div className="space-y-3">
+          <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-black shadow-2xl shadow-black/40">
+            <video
+              key={finalVideoUrl!}
+              controls
+              autoPlay
+              className="aspect-video w-full"
+              src={uploadUrl(finalVideoUrl!)}
+            />
+          </div>
+          <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5">
+            <span className="text-sm font-medium text-emerald-700">{t("project.finalVideo")}</span>
+            <span className="text-xs text-emerald-600/70">{t("project.finalVideoHint")}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Shot clips player */}
       {shotsWithVideo.length > 0 && currentShot ? (
         <div className="space-y-4">
           <div className="overflow-hidden rounded-2xl border border-[--border-subtle] bg-black shadow-2xl shadow-black/40">
             <video
               key={currentShot.id}
               controls
-              autoPlay
+              autoPlay={!hasValidVideo}
               className="aspect-video w-full"
               src={uploadUrl(currentShot.videoUrl!)}
             />
@@ -172,26 +209,6 @@ export default function PreviewPage() {
           <p className="max-w-sm text-center text-sm text-[--text-secondary]">
             {t("shot.noShots")}
           </p>
-        </div>
-      )}
-
-      {/* Final video section */}
-      {(project.status === "completed" || finalVideoPath) && (
-        <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-          <div>
-            <h3 className="font-display text-base font-semibold text-emerald-700">
-              {t("project.finalVideo")}
-            </h3>
-            <p className="mt-1 text-sm text-emerald-600/80">
-              {t("project.finalVideoHint")}
-            </p>
-          </div>
-          {finalVideoPath && (
-            <Button onClick={handleDownload} size="sm" variant="outline" className="border-emerald-300 text-emerald-700 hover:bg-emerald-100">
-              <Download className="h-3.5 w-3.5" />
-              {t("project.downloadVideo")}
-            </Button>
-          )}
         </div>
       )}
     </div>

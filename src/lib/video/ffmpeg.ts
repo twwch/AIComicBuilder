@@ -137,5 +137,6 @@ export async function assembleVideo(params: AssembleParams): Promise<string> {
     fs.renameSync(concatOutputPath, outputPath);
   }
 
-  return outputPath;
+  // Return relative path for uploadUrl compatibility
+  return path.relative(process.cwd(), outputPath);
 }
