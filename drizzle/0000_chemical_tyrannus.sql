@@ -1,4 +1,4 @@
-CREATE TABLE `characters` (
+CREATE TABLE IF NOT EXISTS `characters` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
 	`name` text NOT NULL,
@@ -7,7 +7,7 @@ CREATE TABLE `characters` (
 	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE TABLE `dialogues` (
+CREATE TABLE IF NOT EXISTS `dialogues` (
 	`id` text PRIMARY KEY NOT NULL,
 	`shot_id` text NOT NULL,
 	`character_id` text NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE `dialogues` (
 	FOREIGN KEY (`character_id`) REFERENCES `characters`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE TABLE `projects` (
+CREATE TABLE IF NOT EXISTS `projects` (
 	`id` text PRIMARY KEY NOT NULL,
 	`title` text NOT NULL,
 	`idea` text DEFAULT '',
@@ -29,7 +29,7 @@ CREATE TABLE `projects` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE `shots` (
+CREATE TABLE IF NOT EXISTS `shots` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
 	`sequence` integer NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE `shots` (
 	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE TABLE `tasks` (
+CREATE TABLE IF NOT EXISTS `tasks` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text,
 	`type` text NOT NULL,
