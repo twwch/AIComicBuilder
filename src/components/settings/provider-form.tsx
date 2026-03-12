@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   useModelStore,
+  supportsCapability,
   type Provider,
   type Protocol,
   type Capability,
@@ -38,6 +39,14 @@ export function ProviderForm({ provider }: ProviderFormProps) {
   const [manualModelId, setManualModelId] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
+  const baseUrlPlaceholder =
+    provider.protocol === "seedance"
+      ? "https://ark.cn-beijing.volces.com/api/v3"
+      : "https://api.openai.com";
+  const fetchDisabled =
+    fetching ||
+    (provider.protocol === "openai" && (!provider.baseUrl || !provider.apiKey)) ||
+    (provider.protocol === "gemini" && !provider.apiKey);
 
   async function handleFetchModels() {
     setFetching(true);
@@ -78,6 +87,7 @@ export function ProviderForm({ provider }: ProviderFormProps) {
   }
 
   function handleCapabilityToggle(cap: Capability) {
+    if (!supportsCapability(provider.protocol, cap)) return;
     const caps = provider.capabilities.includes(cap)
       ? provider.capabilities.filter((c) => c !== cap)
       : [...provider.capabilities, cap];
@@ -121,19 +131,25 @@ export function ProviderForm({ provider }: ProviderFormProps) {
         <div className="space-y-1.5">
           <Label className="text-xs">{t("capabilities")}</Label>
           <div className="flex gap-1.5 pt-0.5">
-            {CAPABILITY_OPTIONS.map((opt) => (
+            {CAPABILITY_OPTIONS.map((opt) => {
+              const enabled = supportsCapability(provider.protocol, opt.value);
+              return (
               <button
                 key={opt.value}
                 onClick={() => handleCapabilityToggle(opt.value)}
+                disabled={!enabled}
                 className={`rounded-lg border px-2.5 py-[7px] text-xs transition-all ${
-                  provider.capabilities.includes(opt.value)
+                  provider.capabilities.includes(opt.value) && enabled
                     ? "border-primary/30 bg-primary/8 text-primary font-medium"
-                    : "border-[--border-subtle] text-[--text-secondary] hover:border-[--border-hover]"
+                    : enabled
+                      ? "border-[--border-subtle] text-[--text-secondary] hover:border-[--border-hover]"
+                      : "cursor-not-allowed border-[--border-subtle] text-[--text-muted] opacity-50"
                 }`}
               >
                 {opt.label}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -147,7 +163,7 @@ export function ProviderForm({ provider }: ProviderFormProps) {
             onChange={(e) =>
               updateProvider(provider.id, { baseUrl: e.target.value })
             }
-            placeholder="https://api.openai.com"
+            placeholder={baseUrlPlaceholder}
           />
         </div>
         <div className="space-y-1.5">
@@ -188,7 +204,7 @@ export function ProviderForm({ provider }: ProviderFormProps) {
             size="sm"
             variant="outline"
             onClick={handleFetchModels}
-            disabled={fetching || !provider.apiKey}
+            disabled={fetchDisabled}
           >
             {fetching ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

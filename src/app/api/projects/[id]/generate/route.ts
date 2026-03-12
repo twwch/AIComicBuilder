@@ -28,6 +28,7 @@ import {
   buildFirstFramePrompt,
   buildLastFramePrompt,
 } from "@/lib/ai/prompts/frame-generate";
+import { buildFrameCharacterDescriptions } from "@/lib/ai/prompts/frame-context";
 import { resolveImageProvider, resolveVideoProvider } from "@/lib/ai/provider-factory";
 import { buildCharacterTurnaroundPrompt } from "@/lib/ai/prompts/character-image";
 import { assembleVideo } from "@/lib/video/ffmpeg";
@@ -470,13 +471,7 @@ async function handleBatchFrameGenerate(
     .from(characters)
     .where(eq(characters.projectId, projectId));
 
-  const characterDescriptions = projectCharacters
-    .map((c) => {
-      let desc = `${c.name}: ${c.description}`;
-      if (c.referenceImage) desc += ` [ref: ${c.referenceImage}]`;
-      return desc;
-    })
-    .join("\n");
+  const characterDescriptions = buildFrameCharacterDescriptions(projectCharacters);
 
   const ai = resolveImageProvider(modelConfig);
   const results: Array<{ shotId: string; sequence: number; status: string; firstFrame?: string; lastFrame?: string; error?: string }> = [];
@@ -583,13 +578,7 @@ async function handleSingleFrameGenerate(
     .from(characters)
     .where(eq(characters.projectId, projectId));
 
-  const characterDescriptions = projectCharacters
-    .map((c) => {
-      let d = `${c.name}: ${c.description}`;
-      if (c.referenceImage) d += ` [ref: ${c.referenceImage}]`;
-      return d;
-    })
-    .join("\n");
+  const characterDescriptions = buildFrameCharacterDescriptions(projectCharacters);
 
   // Find previous shot's last frame for continuity
   const [previousShot] = await db

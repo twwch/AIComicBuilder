@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useModelStore, type Capability, type ModelRef } from "@/stores/model-store";
+import {
+  supportsModelCapability,
+  useModelStore,
+  supportsCapability,
+  type Capability,
+  type ModelRef,
+} from "@/stores/model-store";
 import { Type, ImageIcon, VideoIcon, ChevronDown, Check } from "lucide-react";
 
 const ICONS: Record<Capability, React.ReactNode> = {
@@ -41,9 +47,11 @@ export function InlineModelPicker({ capability }: InlineModelPickerProps) {
 
   const options: { providerId: string; providerName: string; modelId: string; modelName: string }[] = [];
   for (const p of providers) {
+    if (!supportsCapability(p.protocol, capability)) continue;
     if (!p.capabilities.includes(capability)) continue;
     for (const m of p.models) {
       if (!m.checked) continue;
+      if (!supportsModelCapability(p.protocol, m.id, capability)) continue;
       options.push({
         providerId: p.id,
         providerName: p.name,

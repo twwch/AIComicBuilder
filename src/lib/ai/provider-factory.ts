@@ -31,6 +31,12 @@ export function createAIProvider(config: ProviderConfig): AIProvider {
         baseUrl: config.baseUrl,
         model: config.modelId,
       });
+    case "seedance":
+      return new SeedanceProvider({
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl,
+        model: config.modelId,
+      });
     default:
       throw new Error(`Unsupported AI protocol: ${config.protocol}`);
   }

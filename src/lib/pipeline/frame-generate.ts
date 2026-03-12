@@ -6,6 +6,7 @@ import {
   buildFirstFramePrompt,
   buildLastFramePrompt,
 } from "@/lib/ai/prompts/frame-generate";
+import { buildFrameCharacterDescriptions } from "@/lib/ai/prompts/frame-context";
 import { eq, and, lt, desc } from "drizzle-orm";
 import type { Task } from "@/lib/task-queue";
 
@@ -29,9 +30,7 @@ export async function handleFrameGenerate(task: Task) {
     .from(characters)
     .where(eq(characters.projectId, payload.projectId));
 
-  const characterDescriptions = projectCharacters
-    .map((c) => `${c.name}: ${c.description}`)
-    .join("\n");
+  const characterDescriptions = buildFrameCharacterDescriptions(projectCharacters);
 
   // Find previous shot's last frame for continuity
   const [previousShot] = await db

@@ -57,7 +57,9 @@ GEMINI_API_KEY=
 
 # Seedance (视频生成)
 SEEDANCE_API_KEY=
-SEEDANCE_BASE_URL=
+SEEDANCE_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
+SEEDANCE_IMAGE_MODEL=doubao-seedream-5-0-260128
+SEEDANCE_MODEL=doubao-seedance-1-5-pro-250528
 ```
 
 ### 初始化数据库

@@ -1,7 +1,12 @@
 "use client";
 
 import { Label } from "@/components/ui/label";
-import { useModelStore, type ModelRef } from "@/stores/model-store";
+import {
+  supportsModelCapability,
+  useModelStore,
+  supportsCapability,
+  type ModelRef,
+} from "@/stores/model-store";
 import { useTranslations } from "next-intl";
 import { Type, ImageIcon, VideoIcon } from "lucide-react";
 
@@ -88,12 +93,24 @@ export function DefaultModelPicker() {
       modelName: string;
     }[] = [];
     for (const p of providers) {
+      if (!supportsCapability(p.protocol, capability as "text" | "image" | "video")) {
+        continue;
+      }
       if (
         !p.capabilities.includes(capability as "text" | "image" | "video")
       )
         continue;
       for (const m of p.models) {
         if (!m.checked) continue;
+        if (
+          !supportsModelCapability(
+            p.protocol,
+            m.id,
+            capability as "text" | "image" | "video"
+          )
+        ) {
+          continue;
+        }
         result.push({
           providerId: p.id,
           providerName: p.name,

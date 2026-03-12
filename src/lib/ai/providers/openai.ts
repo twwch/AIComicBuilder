@@ -3,6 +3,7 @@ import type { AIProvider, TextOptions, ImageOptions } from "../types";
 import fs from "node:fs";
 import path from "node:path";
 import { ulid } from "ulid";
+import { sanitizeImagePromptText } from "@/lib/ai/prompts/frame-context";
 
 function normalizeBaseUrl(url?: string): string {
   const cleaned = (url || "https://api.openai.com/v1").replace(/\/+$/, "");
@@ -334,6 +335,7 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async generateImage(prompt: string, options?: ImageOptions): Promise<string> {
+    const sanitizedPrompt = sanitizeImagePromptText(prompt);
     const model = options?.model || this.defaultImageModel;
     const isGptImageModel = model.startsWith("gpt-image");
     const requestedSize = options?.size || "1024x1024";
@@ -362,11 +364,11 @@ export class OpenAIProvider implements AIProvider {
 
     for (const currentModel of this.getCandidateModels(model)) {
       const endpointAttempts = [
-        ...this.buildImageAttempts(currentModel, prompt, size, quality).map((body) => ({
+        ...this.buildImageAttempts(currentModel, sanitizedPrompt, size, quality).map((body) => ({
           endpoint: "images",
           body,
         })),
-        ...this.buildChatImageAttempts(currentModel, prompt).map((body) => ({
+        ...this.buildChatImageAttempts(currentModel, sanitizedPrompt).map((body) => ({
           endpoint: "chat",
           body,
         })),

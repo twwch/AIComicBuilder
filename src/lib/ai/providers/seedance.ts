@@ -1,7 +1,15 @@
-import type { VideoProvider, VideoGenerateParams } from "../types";
+import type {
+  AIProvider,
+  ImageOptions,
+  TextOptions,
+  VideoProvider,
+  VideoGenerateParams,
+} from "../types";
 import fs from "node:fs";
 import path from "node:path";
 import { ulid } from "ulid";
+import { sanitizeImagePromptText } from "@/lib/ai/prompts/frame-context";
+import { normalizeSeedanceBaseUrl } from "./seedance-url";
 
 function toDataUrl(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase().replace(".", "");
@@ -17,10 +25,56 @@ function toDataUrl(filePath: string): string {
   return `data:${mime};base64,${base64}`;
 }
 
-export class SeedanceProvider implements VideoProvider {
+function compactJSON(value: unknown): string {
+  return JSON.stringify(value, null, 2).slice(0, 1200);
+}
+
+function extractImagePayloadFromString(value: string): {
+  url?: string;
+  b64?: string;
+} | null {
+  const trimmed = value.trim();
+
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith("data:image/")) {
+    return {
+      b64: trimmed.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, ""),
+    };
+  }
+
+  const directUrlMatch = trimmed.match(/https?:\/\/[^\s)]+/);
+  if (directUrlMatch) {
+    return { url: directUrlMatch[0] };
+  }
+
+  return null;
+}
+
+function normalizeSeedanceImageSize(size?: string): string | null {
+  if (!size) return "2K";
+
+  const normalized = size.trim().toUpperCase();
+  if (!normalized) return "2K";
+  if (/^\d+K$/.test(normalized)) return normalized;
+
+  const match = normalized.match(/^(\d+)X(\d+)$/);
+  if (!match) return normalized;
+
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  const maxDimension = Math.max(width, height);
+
+  if (maxDimension <= 1024) return "1K";
+  if (maxDimension <= 2048) return "2K";
+  return "4K";
+}
+
+export class SeedanceProvider implements AIProvider, VideoProvider {
   private apiKey: string;
   private baseUrl: string;
-  private model: string;
+  private defaultImageModel: string;
+  private defaultVideoModel: string;
   private uploadDir: string;
 
   constructor(params?: {
@@ -30,15 +84,211 @@ export class SeedanceProvider implements VideoProvider {
     uploadDir?: string;
   }) {
     this.apiKey = params?.apiKey || process.env.SEEDANCE_API_KEY || "";
-    this.baseUrl = (
-      params?.baseUrl ||
-      process.env.SEEDANCE_BASE_URL ||
-      "https://ark.cn-beijing.volces.com"
-    ).replace(/\/+$/, "");
-    this.model =
-      params?.model || process.env.SEEDANCE_MODEL || "doubao-seedance-1-5-pro-250528";
+    this.baseUrl = normalizeSeedanceBaseUrl(
+      params?.baseUrl || process.env.SEEDANCE_BASE_URL
+    );
+    this.defaultImageModel =
+      params?.model ||
+      process.env.SEEDANCE_IMAGE_MODEL ||
+      "doubao-seedream-5-0-260128";
+    this.defaultVideoModel =
+      params?.model ||
+      process.env.SEEDANCE_MODEL ||
+      "doubao-seedance-1-5-pro-250528";
     this.uploadDir =
       params?.uploadDir || process.env.UPLOAD_DIR || "./uploads";
+  }
+
+  async generateText(_prompt: string, _options?: TextOptions): Promise<string> {
+    throw new Error("Seedance does not support text generation in this project");
+  }
+
+  private buildImageAttempts(
+    model: string,
+    prompt: string,
+    size?: string
+  ): Array<Record<string, unknown>> {
+    const normalizedSize = normalizeSeedanceImageSize(size);
+    const baseBody: Record<string, unknown> = {
+      model,
+      prompt,
+      sequential_image_generation: "disabled",
+      response_format: "url",
+      stream: false,
+      watermark: true,
+    };
+
+    return [
+      normalizedSize ? { ...baseBody, size: normalizedSize } : baseBody,
+      baseBody,
+      normalizedSize
+        ? { ...baseBody, size: normalizedSize, response_format: "b64_json" }
+        : { ...baseBody, response_format: "b64_json" },
+      normalizedSize
+        ? { ...baseBody, size: normalizedSize, watermark: false }
+        : { ...baseBody, watermark: false },
+    ].filter(
+      (attempt, index, all) =>
+        all.findIndex((candidate) => compactJSON(candidate) === compactJSON(attempt)) === index
+    );
+  }
+
+  private async requestImageGeneration(
+    body: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    const response = await fetch(`${this.baseUrl}/images/generations`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const rawText = await response.text();
+    let json: Record<string, unknown> | null = null;
+    try {
+      json = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {};
+    } catch {
+      if (!response.ok) {
+        throw new Error(
+          `Seedance image generation failed (${response.status}): ${rawText.slice(0, 400)}`
+        );
+      }
+      throw new Error(
+        `Seedance image generation returned non-JSON response: ${rawText.slice(0, 400)}`
+      );
+    }
+
+    if (!response.ok) {
+      const errorMessage =
+        typeof json?.error === "object" &&
+        json.error &&
+        "message" in json.error &&
+        typeof json.error.message === "string"
+          ? json.error.message
+          : compactJSON(json);
+      throw new Error(
+        `Seedance image generation failed (${response.status}): ${errorMessage}`
+      );
+    }
+
+    return json;
+  }
+
+  private extractImagePayload(result: Record<string, unknown>): {
+    url?: string;
+    b64?: string;
+  } | null {
+    const candidates: unknown[] = [
+      result,
+      result.data,
+      Array.isArray(result.data) ? result.data[0] : null,
+      result.output,
+      Array.isArray(result.output) ? result.output[0] : null,
+      result.result,
+      typeof result.result === "object" && result.result !== null
+        ? (result.result as Record<string, unknown>).data
+        : null,
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+
+      if (typeof candidate === "string") {
+        const parsed = extractImagePayloadFromString(candidate);
+        if (parsed) return parsed;
+        continue;
+      }
+
+      if (Array.isArray(candidate)) {
+        for (const nested of candidate) {
+          if (typeof nested !== "object" || nested === null) continue;
+          const nestedPayload = this.extractImagePayload(
+            nested as Record<string, unknown>
+          );
+          if (nestedPayload) return nestedPayload;
+        }
+        continue;
+      }
+
+      if (typeof candidate !== "object") continue;
+      const record = candidate as Record<string, unknown>;
+
+      for (const key of ["url", "image_url"]) {
+        const value = record[key];
+        if (typeof value === "string" && value) {
+          return extractImagePayloadFromString(value) || { url: value };
+        }
+        if (typeof value === "object" && value !== null) {
+          const nestedUrl = (value as Record<string, unknown>).url;
+          if (typeof nestedUrl === "string" && nestedUrl) {
+            return extractImagePayloadFromString(nestedUrl) || { url: nestedUrl };
+          }
+        }
+      }
+
+      for (const key of ["b64_json", "base64", "image_base64", "data"]) {
+        const value = record[key];
+        if (typeof value === "string" && value) {
+          const parsed = extractImagePayloadFromString(value);
+          if (parsed) return parsed;
+          return { b64: value };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  async generateImage(prompt: string, options?: ImageOptions): Promise<string> {
+    const sanitizedPrompt = sanitizeImagePromptText(prompt);
+    const filename = `${ulid()}.png`;
+    const dir = path.join(this.uploadDir, "frames");
+    fs.mkdirSync(dir, { recursive: true });
+    const filepath = path.join(dir, filename);
+    const errors: string[] = [];
+
+    for (const body of this.buildImageAttempts(
+      options?.model || this.defaultImageModel,
+      sanitizedPrompt,
+      options?.size
+    )) {
+      try {
+        const response = await this.requestImageGeneration(body);
+        const payload = this.extractImagePayload(response);
+
+        if (payload?.url) {
+          const imageResponse = await fetch(payload.url);
+          if (!imageResponse.ok) {
+            throw new Error(
+              `Seedance image download failed (${imageResponse.status})`
+            );
+          }
+          const buffer = Buffer.from(await imageResponse.arrayBuffer());
+          fs.writeFileSync(filepath, buffer);
+          return filepath;
+        }
+
+        if (payload?.b64) {
+          const buffer = Buffer.from(payload.b64, "base64");
+          fs.writeFileSync(filepath, buffer);
+          return filepath;
+        }
+
+        errors.push(
+          `Request returned no image payload. Request: ${compactJSON(body)} Response: ${compactJSON(response)}`
+        );
+      } catch (error) {
+        errors.push(
+          `Request failed. Request: ${compactJSON(body)} Error: ${String(error)}`
+        );
+      }
+    }
+
+    throw new Error(
+      `No usable image payload returned from Seedance image API.\n${errors.join("\n")}`
+    );
   }
 
   async generateVideo(params: VideoGenerateParams): Promise<string> {
@@ -64,7 +314,7 @@ export class SeedanceProvider implements VideoProvider {
     ];
 
     const body: Record<string, unknown> = {
-      model: this.model,
+      model: this.defaultVideoModel,
       content,
       duration: params.duration || 5,
       ratio: params.ratio || "16:9",
@@ -72,7 +322,7 @@ export class SeedanceProvider implements VideoProvider {
     };
 
     console.log(
-      `[Seedance] Submitting task: model=${this.model}, duration=${body.duration}, ratio=${body.ratio}`
+      `[Seedance] Submitting task: model=${this.defaultVideoModel}, duration=${body.duration}, ratio=${body.ratio}`
     );
 
     const submitResponse = await fetch(
