@@ -44,6 +44,22 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as ListRequest;
 
+    if (body.protocol === "kling") {
+      return NextResponse.json({
+        models: [
+          { id: "kling-v1", name: "Kling v1" },
+          { id: "kling-v1-5", name: "Kling v1.5" },
+          { id: "kling-v1-6", name: "Kling v1.6" },
+          { id: "kling-v2", name: "Kling v2" },
+          { id: "kling-v2-new", name: "Kling v2 New" },
+          { id: "kling-v2-1", name: "Kling v2.1" },
+          { id: "kling-v2-master", name: "Kling v2 Master" },
+          { id: "kling-v2-1-master", name: "Kling v2.1 Master" },
+          { id: "kling-v2-5-turbo", name: "Kling v2.5 Turbo" },
+        ],
+      });
+    }
+
     if (!body.baseUrl) {
       return NextResponse.json({ error: "Base URL is required" }, { status: 400 });
     }
