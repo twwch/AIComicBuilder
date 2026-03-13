@@ -162,6 +162,7 @@ export function ShotCard({
           sceneDescription: prompt,
           motionScript,
           cameraDirection,
+          duration: editDuration,
           characterDescriptions,
         })
       : prompt;
@@ -345,7 +346,7 @@ export function ShotCard({
               onChange={(e) => setEditStartFrame(e.target.value)}
               onBlur={() => patchShot({ startFrameDesc: editStartFrame })}
               rows={2}
-              className="border-0 bg-transparent p-0 text-sm focus-visible:ring-0"
+              className="rounded-none border-0 bg-transparent p-0 text-sm focus-visible:ring-0"
               placeholder="Start frame description..."
             />
           </div>
@@ -360,7 +361,7 @@ export function ShotCard({
               onChange={(e) => setEditEndFrame(e.target.value)}
               onBlur={() => patchShot({ endFrameDesc: editEndFrame })}
               rows={2}
-              className="border-0 bg-transparent p-0 text-sm focus-visible:ring-0"
+              className="rounded-none border-0 bg-transparent p-0 text-sm focus-visible:ring-0"
               placeholder="End frame description..."
             />
           </div>
@@ -375,7 +376,7 @@ export function ShotCard({
               onChange={(e) => setEditMotionScript(e.target.value)}
               onBlur={() => patchShot({ motionScript: editMotionScript })}
               rows={2}
-              className="border-0 bg-transparent p-0 text-sm focus-visible:ring-0"
+              className="rounded-none border-0 bg-transparent p-0 text-sm focus-visible:ring-0"
               placeholder="Motion script..."
             />
           </div>

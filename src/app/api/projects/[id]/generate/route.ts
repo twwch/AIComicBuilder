@@ -710,6 +710,7 @@ async function handleSingleVideoGenerate(
           sceneDescription: shot.prompt || "",
           motionScript: shot.motionScript,
           cameraDirection: shot.cameraDirection || "static",
+          duration: shot.duration ?? 10,
           characterDescriptions,
         })
       : shot.prompt || "";
@@ -784,6 +785,7 @@ async function handleBatchVideoGenerate(
             sceneDescription: shot.prompt || "",
             motionScript: shot.motionScript,
             cameraDirection: shot.cameraDirection || "static",
+            duration: shot.duration ?? 10,
             characterDescriptions,
           })
         : shot.prompt || "";

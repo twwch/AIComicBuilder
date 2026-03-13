@@ -31,6 +31,7 @@ export async function handleVideoGenerate(task: Task) {
         sceneDescription: shot.prompt || "",
         motionScript: shot.motionScript,
         cameraDirection: shot.cameraDirection || "static",
+        duration: shot.duration ?? 10,
       })
     : shot.prompt || "";
 
