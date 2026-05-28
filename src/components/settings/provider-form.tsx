@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   useModelStore,
   type Provider,
@@ -345,6 +346,11 @@ export function ProviderForm({ provider }: ProviderFormProps) {
                         >
                           {model.name}
                         </span>
+                        {model.id.startsWith("happyhorse") && (
+                          <Badge variant="outline" className="flex-shrink-0 text-[9px] px-1 py-0 h-3.5 bg-primary/10 text-primary border-primary/30">
+                            新
+                          </Badge>
+                        )}
                         <button
                           onClick={(e) => {
                             e.preventDefault();

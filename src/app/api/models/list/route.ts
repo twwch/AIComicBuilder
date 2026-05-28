@@ -101,6 +101,10 @@ export async function POST(request: Request) {
           { id: "wan2.6-i2v", name: "Wan 2.6 图生视频" },
           { id: "wan2.6-r2v", name: "Wan 2.6 参考生视频" },
           { id: "wan2.6-r2v-flash", name: "Wan 2.6 参考生视频 Flash" },
+          { id: "happyhorse-1.0-t2v", name: "HappyHorse 1.0 文生视频" },
+          { id: "happyhorse-1.0-i2v", name: "HappyHorse 1.0 图生视频" },
+          { id: "happyhorse-1.0-r2v", name: "HappyHorse 1.0 参考生视频" },
+          { id: "happyhorse-1.0-video-edit", name: "HappyHorse 1.0 视频编辑" },
         ],
       });
     }
