@@ -66,6 +66,11 @@ export class WanVideoProvider implements VideoProvider {
     return this.model.startsWith("wan2.7");
   }
 
+  // Detect whether this instance is running a HappyHorse model
+  private get isHappyHorse(): boolean {
+    return this.model.startsWith("happyhorse");
+  }
+
   async generateVideo(params: VideoGenerateParams): Promise<VideoGenerateResult> {
     let body: Record<string, unknown>;
 
@@ -161,6 +166,22 @@ export class WanVideoProvider implements VideoProvider {
       };
     }
 
+    if (this.isHappyHorse) {
+      // HappyHorse i2v: only supports first_frame, no last_frame
+      return {
+        model: this.model,
+        input: {
+          prompt: params.prompt,
+          img_url: toImageUrl(params.firstFrame),
+        },
+        parameters: {
+          resolution: "720P",
+          ratio: normaliseRatio(params.ratio),
+          duration: params.duration || 5,
+        },
+      };
+    }
+
     // wan2.6 / wan2.1: image-to-video, uses img_url for first frame only
     return {
       model: this.model,
@@ -204,6 +225,32 @@ export class WanVideoProvider implements VideoProvider {
       };
     }
 
+    if (this.isHappyHorse) {
+      // HappyHorse r2v: reference_image via media[] (similar to wan2.7)
+      const media: { type: string; url: string }[] = [
+        { type: "reference_image", url: toImageUrl(params.initialImage) },
+      ];
+
+      if (params.referenceImages && params.referenceImages.length > 0) {
+        for (const refImg of params.referenceImages.slice(0, 8)) {
+          media.push({ type: "reference_image", url: toImageUrl(refImg) });
+        }
+      }
+
+      return {
+        model: this.model,
+        input: {
+          prompt: params.prompt,
+          media,
+        },
+        parameters: {
+          resolution: "720P",
+          ratio: normaliseRatio(params.ratio),
+          duration: params.duration || 5,
+        },
+      };
+    }
+
     // wan2.6 / wan2.1: img_url for initial image
     return {
       model: this.model,
@@ -225,6 +272,21 @@ export class WanVideoProvider implements VideoProvider {
     if (this.isWan27) {
       return {
         model,
+        input: {
+          prompt: params.prompt,
+        },
+        parameters: {
+          resolution: "720P",
+          ratio: normaliseRatio(params.ratio),
+          duration: params.duration || 5,
+        },
+      };
+    }
+
+    if (this.isHappyHorse) {
+      // HappyHorse t2v: resolution/ratio format (similar to wan2.7)
+      return {
+        model: this.model,
         input: {
           prompt: params.prompt,
         },

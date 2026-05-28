@@ -18,6 +18,10 @@ export const MODEL_MAX_DURATIONS: Record<string, number> = {
   "wan2.6-i2v": 10,
   "wan2.6-r2v": 10,
   "wan2.6-r2v-flash": 10,
+  "happyhorse-1.0-t2v": 15,
+  "happyhorse-1.0-i2v": 15,
+  "happyhorse-1.0-r2v": 15,
+  "happyhorse-1.0-video-edit": 15,
 };
 
 /** Family-level fallback: if modelId contains this substring, use this duration */
@@ -27,6 +31,7 @@ const FAMILY_MAX_DURATIONS: [string, number][] = [
   ["kling", 10],
   ["seedance-1-0", 5],
   ["seedance", 12],
+  ["happyhorse", 15],
   ["wan2.7", 15],
   ["wan2.6", 15],
   ["wan", 15],
