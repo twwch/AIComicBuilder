@@ -7,6 +7,8 @@ import { KlingVideoProvider } from "./providers/kling-video";
 import { WanVideoProvider } from "./providers/wan-video";
 import { UCloudSeedanceProvider } from "./providers/ucloud-seedance";
 import { DashScopeImageProvider } from "./providers/dashscope-image";
+import { AtlasCloudProvider } from "./providers/atlascloud";
+import { AtlasCloudVideoProvider } from "./providers/atlascloud-video";
 import { getAIProvider, getVideoProvider } from "./index";
 import type { AIProvider, VideoProvider } from "./types";
 
@@ -55,6 +57,13 @@ export function createAIProvider(config: ProviderConfig, uploadDir?: string): AI
         model: config.modelId,
         ...(uploadDir && { uploadDir }),
       });
+    case "atlascloud":
+      return new AtlasCloudProvider({
+        apiKey: config.apiKey,
+        baseURL: config.baseUrl,
+        model: config.modelId,
+        ...(uploadDir && { uploadDir }),
+      });
     default:
       throw new Error(`Unsupported AI protocol: ${config.protocol}`);
   }
@@ -93,6 +102,13 @@ export function createVideoProvider(config: ProviderConfig, uploadDir?: string):
       });
     case "ucloud-seedance":
       return new UCloudSeedanceProvider({
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl,
+        model: config.modelId,
+        ...(uploadDir && { uploadDir }),
+      });
+    case "atlascloud":
+      return new AtlasCloudVideoProvider({
         apiKey: config.apiKey,
         baseUrl: config.baseUrl,
         model: config.modelId,

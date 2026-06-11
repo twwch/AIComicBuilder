@@ -21,6 +21,7 @@ const DEFAULT_BASE_URLS: Record<Protocol, string> = {
   kling: "https://api.klingai.com",
   wan: "https://dashscope.aliyuncs.com/api/v1",
   dashscope: "https://dashscope.aliyuncs.com/api/v1",
+  atlascloud: "https://api.atlascloud.ai/v1",
 };
 
 function getProtocolOptions(capability: Capability): { value: Protocol; label: string }[] {
@@ -28,6 +29,7 @@ function getProtocolOptions(capability: Capability): { value: Protocol; label: s
     return [
       { value: "openai", label: "OpenAI" },
       { value: "gemini", label: "Gemini" },
+      { value: "atlascloud", label: "Atlas Cloud" },
     ];
   }
   if (capability === "image") {
@@ -36,6 +38,7 @@ function getProtocolOptions(capability: Capability): { value: Protocol; label: s
       { value: "gemini", label: "Gemini" },
       { value: "kling", label: "Kling" },
       { value: "dashscope", label: "百炼 (图片)" },
+      { value: "atlascloud", label: "Atlas Cloud" },
     ];
   }
   // video
@@ -45,6 +48,7 @@ function getProtocolOptions(capability: Capability): { value: Protocol; label: s
     { value: "gemini", label: "Gemini (Veo)" },
     { value: "kling", label: "Kling" },
     { value: "wan", label: "百炼 (视频)" },
+    { value: "atlascloud", label: "Atlas Cloud" },
   ];
 }
 
@@ -76,6 +80,7 @@ export function ProviderForm({ provider }: ProviderFormProps) {
           protocol: provider.protocol,
           baseUrl: provider.baseUrl,
           apiKey: provider.apiKey,
+          capability: provider.capability,
         }),
       });
       const data = await res.json();

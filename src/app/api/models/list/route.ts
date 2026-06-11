@@ -4,6 +4,7 @@ interface ListRequest {
   protocol: string;
   baseUrl: string;
   apiKey: string;
+  capability?: "text" | "image" | "video";
 }
 
 interface ModelItem {
@@ -115,6 +116,38 @@ export async function POST(request: Request) {
           { id: "qwen-image-max", name: "Qwen Image Max" },
           { id: "qwen-image-plus", name: "Qwen Image Plus" },
           { id: "z-image-turbo", name: "Z-Image Turbo" },
+        ],
+      });
+    }
+
+    // Atlas Cloud: image/video models are not listed by the OpenAI-compatible
+    // /v1/models endpoint, so return a curated list per capability. For text,
+    // fall through to the generic /v1/models fetch below (OpenAI-compatible).
+    if (body.protocol === "atlascloud" && body.capability === "image") {
+      return NextResponse.json({
+        models: [
+          { id: "openai/gpt-image-2/text-to-image", name: "GPT Image 2 (Text-to-Image)" },
+          { id: "qwen/qwen-image-2.0/text-to-image", name: "Qwen Image 2.0 (Text-to-Image)" },
+          { id: "qwen/qwen-image-2.0-pro/text-to-image", name: "Qwen Image 2.0 Pro (Text-to-Image)" },
+          { id: "bytedance/seedream-v4.5", name: "Seedream v4.5 (Text-to-Image)" },
+          { id: "google/imagen4", name: "Imagen 4 (Text-to-Image)" },
+          { id: "black-forest-labs/flux-2-pro/text-to-image", name: "FLUX.2 Pro (Text-to-Image)" },
+          { id: "openai/gpt-image-2/edit", name: "GPT Image 2 (Edit / Image-to-Image)" },
+          { id: "qwen/qwen-image-2.0/edit", name: "Qwen Image 2.0 (Edit / Image-to-Image)" },
+        ],
+      });
+    }
+
+    if (body.protocol === "atlascloud" && body.capability === "video") {
+      return NextResponse.json({
+        models: [
+          { id: "bytedance/seedance-2.0-fast/image-to-video", name: "Seedance 2.0 Fast (Image-to-Video)" },
+          { id: "bytedance/seedance-2.0/image-to-video", name: "Seedance 2.0 (Image-to-Video)" },
+          { id: "alibaba/wan-2.7/image-to-video", name: "Wan 2.7 (Image-to-Video)" },
+          { id: "google/veo3.1/image-to-video", name: "Veo 3.1 (Image-to-Video)" },
+          { id: "google/veo3.1-fast/image-to-video", name: "Veo 3.1 Fast (Image-to-Video)" },
+          { id: "kwaivgi/kling-v2.6-pro/image-to-video", name: "Kling v2.6 Pro (Image-to-Video)" },
+          { id: "kwaivgi/kling-v2.5-turbo-pro/image-to-video", name: "Kling v2.5 Turbo Pro (Image-to-Video)" },
         ],
       });
     }
