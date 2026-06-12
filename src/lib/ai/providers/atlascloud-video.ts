@@ -12,7 +12,7 @@ import { toImageUrl, pollPrediction } from "./atlascloud";
  * reference mode (single initial image + optional character references).
  *
  * Equivalent models (drop-in for Seedance / Kling / Veo):
- *   • bytedance/seedance-2.0-fast/image-to-video   (Seedance)
+ *   • bytedance/seedance-2.0/image-to-video        (Seedance, default; -fast is the cheaper/faster tier)
  *   • kwaivgi/kling-v2.6-pro/image-to-video        (Kling)
  *   • alibaba/wan-2.7/image-to-video               (Wan)
  *   • google/veo3.1/image-to-video                 (Veo)
@@ -21,7 +21,7 @@ import { toImageUrl, pollPrediction } from "./atlascloud";
  */
 
 const DEFAULT_LLM_BASE_URL = "https://api.atlascloud.ai/v1";
-const DEFAULT_VIDEO_MODEL = "bytedance/seedance-2.0-fast/image-to-video";
+const DEFAULT_VIDEO_MODEL = "bytedance/seedance-2.0/image-to-video";
 
 function mediaBaseFromLlmBase(llmBase: string): string {
   const trimmed = llmBase.replace(/\/+$/, "");

@@ -141,8 +141,8 @@ export async function POST(request: Request) {
     if (body.protocol === "atlascloud" && body.capability === "video") {
       return NextResponse.json({
         models: [
-          { id: "bytedance/seedance-2.0-fast/image-to-video", name: "Seedance 2.0 Fast (Image-to-Video)" },
           { id: "bytedance/seedance-2.0/image-to-video", name: "Seedance 2.0 (Image-to-Video)" },
+          { id: "bytedance/seedance-2.0-fast/image-to-video", name: "Seedance 2.0 Fast (Image-to-Video)" },
           { id: "alibaba/wan-2.7/image-to-video", name: "Wan 2.7 (Image-to-Video)" },
           { id: "google/veo3.1/image-to-video", name: "Veo 3.1 (Image-to-Video)" },
           { id: "google/veo3.1-fast/image-to-video", name: "Veo 3.1 Fast (Image-to-Video)" },

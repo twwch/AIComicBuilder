@@ -19,7 +19,10 @@ import { id as genId } from "@/lib/id";
 
 const DEFAULT_LLM_BASE_URL = "https://api.atlascloud.ai/v1";
 const DEFAULT_IMAGE_MODEL = "openai/gpt-image-2/text-to-image";
-const DEFAULT_TEXT_MODEL = "deepseek-ai/DeepSeek-V3-0324";
+// deepseek-v4-pro is a reasoning model: give it enough max_tokens (>= 512), otherwise the
+// budget can be spent on the chain-of-thought and `content` comes back empty (finish_reason=length).
+const DEFAULT_TEXT_MODEL = "deepseek-ai/deepseek-v4-pro";
+const MIN_REASONING_MAX_TOKENS = 512;
 
 // Derive the async media base URL ("…/api/v1/model") from the LLM base URL ("…/v1").
 function mediaBaseFromLlmBase(llmBase: string): string {
@@ -31,19 +34,27 @@ function mediaBaseFromLlmBase(llmBase: string): string {
   return `${trimmed}/api/v1/model`;
 }
 
-// Atlas Cloud expects `size` as "W*H" (star separated), e.g. "1024*1024".
-function toAtlasSize(size?: string, aspectRatio?: string): string | undefined {
+// Most Atlas image models expect `size` as "W*H" (star separated), e.g. "1024*1024".
+// OpenAI gpt-image models are the exception: they only accept the "WxH" form (e.g.
+// "1024x1024") from a fixed whitelist and reject the star form, so pick the separator
+// per model family.
+function usesCrossSize(model: string): boolean {
+  return /gpt-image/i.test(model);
+}
+
+function toAtlasSize(model: string, size?: string, aspectRatio?: string): string | undefined {
+  const sep = usesCrossSize(model) ? "x" : "*";
   if (size) {
-    // Accept "1024x1024" or "1024*1024"; normalise to star form.
-    return size.replace(/x/i, "*");
+    // Normalise "1024x1024" / "1024*1024" to the separator this model expects.
+    return size.replace(/[x*]/i, sep);
   }
   if (aspectRatio) {
     const map: Record<string, string> = {
-      "16:9": "1280*720",
-      "9:16": "720*1280",
-      "1:1": "1024*1024",
-      "4:3": "1152*896",
-      "3:4": "896*1152",
+      "16:9": `1280${sep}720`,
+      "9:16": `720${sep}1280`,
+      "1:1": `1024${sep}1024`,
+      "4:3": `1152${sep}896`,
+      "3:4": `896${sep}1152`,
     };
     return map[aspectRatio];
   }
@@ -110,11 +121,15 @@ export class AtlasCloudProvider implements AIProvider {
       messages.push({ role: "user", content: prompt });
     }
 
+    // Default model is a reasoning model — ensure a sensible floor so the chain-of-thought
+    // doesn't consume the whole budget and leave `content` empty.
+    const maxTokens = Math.max(options?.maxTokens ?? MIN_REASONING_MAX_TOKENS, MIN_REASONING_MAX_TOKENS);
+
     const response = await this.client.chat.completions.create({
       model: options?.model || this.defaultModel,
       messages,
       temperature: options?.temperature ?? 0.7,
-      max_tokens: options?.maxTokens,
+      max_tokens: maxTokens,
     });
     return response.choices[0]?.message?.content || "";
   }
@@ -122,7 +137,7 @@ export class AtlasCloudProvider implements AIProvider {
   // ── Image (async media API) ──────────────────────────────────────────────────
   async generateImage(prompt: string, options?: ImageOptions): Promise<string> {
     const model = options?.model || DEFAULT_IMAGE_MODEL;
-    const size = toAtlasSize(options?.size, options?.aspectRatio);
+    const size = toAtlasSize(model, options?.size, options?.aspectRatio);
 
     // Reference images (e.g. character refs) go in `images`, newline-separated.
     const referenceImages = options?.referenceImages?.length
