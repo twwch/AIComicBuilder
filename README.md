@@ -18,8 +18,18 @@ AI 驱动的漫剧生成器 — 从剧本到动画视频的全自动流水线。
 
 本网站全程由 AI 驱动开发， 开发指南：https://github.com/twwch/vibe-coding
 
+---
 
+<p align="center">
+  <a href="https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=AIComicBuilder">
+    <img src="./public/atlas-cloud-logo.png" alt="Atlas Cloud" width="200">
+  </a>
+</p>
 
+> 🎁 **[Atlas Cloud](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=AIComicBuilder)** 用一个 API Key 同时为 AIComicBuilder 的「剧本 → 角色 → 关键帧 → 视频」全流程提供文本（LLM，OpenAI 兼容）与图像 / 视频生成能力——DeepSeek、Qwen、GLM、Kimi 等 LLM，以及 Seedance、Kling、Veo、Wan 等图像 / 视频模型，无需分别对接多家厂商。
+> [coding plan](https://www.atlascloud.ai/console/coding-plan) · [模型列表](https://www.atlascloud.ai/models)
+
+---
 
 ## 功能特性
 
@@ -40,7 +50,7 @@ AI 驱动的漫剧生成器 — 从剧本到动画视频的全自动流水线。
 - **多语言** — 中文 / English / 日本語 / 한국어
 - **风格自适应** — 自动识别剧本风格（动漫/写实等），角色四视图与首尾帧生成均匹配对应风格
 - **视频比例** — 支持 16:9 / 9:16 / 1:1 / 自适应比例，首尾帧与视频生成统一比例
-- **多模型** — 支持 OpenAI、Gemini、Kling、Seedance、Veo 等多家 AI 供应商，可按项目配置
+- **多模型** — 支持 OpenAI、Gemini、Kling、Seedance、Veo、Atlas Cloud 等多家 AI 供应商，可按项目配置
 
 ## 技术栈
 
@@ -50,9 +60,9 @@ AI 驱动的漫剧生成器 — 从剧本到动画视频的全自动流水线。
 | 前端 | React 19, Tailwind CSS 4, Zustand, Base UI |
 | 国际化 | next-intl |
 | 数据库 | SQLite + Drizzle ORM |
-| AI 文本 | OpenAI / Gemini (via AI SDK) |
-| AI 图像 | OpenAI DALL-E / Gemini Imagen / Kling |
-| AI 视频 | Seedance / Kling / Veo |
+| AI 文本 | OpenAI / Gemini / Atlas Cloud (via AI SDK) |
+| AI 图像 | OpenAI DALL-E / Gemini Imagen / Kling / Atlas Cloud |
+| AI 视频 | Seedance / Kling / Veo / Atlas Cloud |
 | 视频处理 | FFmpeg (fluent-ffmpeg) |
 | 包管理 | pnpm |
 
@@ -84,6 +94,52 @@ pnpm dev
 
 访问 [http://localhost:3000](http://localhost:3000)
 
+## AI 供应商
+
+在 **设置** 页面按文本 / 图像 / 视频三类分别添加供应商。除 OpenAI、Gemini、Kling、Seedance、Veo、百炼外，还内置了 **[Atlas Cloud](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=AIComicBuilder)** —— 一个密钥即可同时覆盖文本、图像、视频三类能力。
+
+### Atlas Cloud
+
+[Atlas Cloud](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=AIComicBuilder) 用同一个 API Key 聚合了 300+ 模型：
+
+- **文本（LLM）** — OpenAI 兼容接口，Base URL `https://api.atlascloud.ai/v1`，默认模型 `deepseek-ai/deepseek-v4-pro`（也可选 Claude / GPT / Gemini / Qwen 等）。`deepseek-v4-pro` 是推理（reasoning）模型，调用时需给足 `max_tokens`（≥ 512），否则 token 可能先耗在思维链上、`content` 返回空。
+- **图像** — 走 Atlas 异步媒体接口，如 `openai/gpt-image-2/text-to-image`、`qwen/qwen-image-2.0/text-to-image`。
+- **视频** — 同样走异步媒体接口（首尾帧 / 参考图模式），可直接选用 Seedance / Kling / Veo / Wan 的 Atlas 等价模型。
+
+配置方式：在对应分类下新增供应商，协议选 **Atlas Cloud**，填入 API Key 即可（Base URL 默认已填好）。也可用环境变量 `ATLASCLOUD_API_KEY` 作为默认供应商（见 `.env.example`）。
+
+本项目常用模型在 Atlas Cloud 上的等价调用名：
+
+| 能力 | 原模型 | Atlas Cloud 调用名 |
+|------|--------|--------------------|
+| 视频（图生视频） | Seedance 2.0 | `bytedance/seedance-2.0/image-to-video`（更快更省可用 `-fast` 变体） |
+| 视频（图生视频） | Kling | `kwaivgi/kling-v2.6-pro/image-to-video` |
+| 视频（图生视频） | Veo 3.1 | `google/veo3.1/image-to-video` |
+| 视频（图生视频） | Wan 2.7 | `alibaba/wan-2.7/image-to-video` |
+| 图像（文生图） | GPT Image | `openai/gpt-image-2/text-to-image` |
+| 图像（文生图） | Qwen-Image | `qwen/qwen-image-2.0/text-to-image` |
+
+> 注意：Atlas 媒体接口的 `size` 用星号分隔（如 `1024*1024`）；Seedance 系列需要 `shot_type`，本项目已自动处理。生成结果 URL 为临时地址，应用会在生成后立即下载并持久化到 `uploads/`。
+
+<details>
+<summary>Atlas Cloud 全部对话模型（59 个，OpenAI 兼容 <code>/v1/chat/completions</code>）</summary>
+
+> 与官网 [模型页](https://www.atlascloud.ai/models) 一致；文本默认 `deepseek-ai/deepseek-v4-pro`。
+
+- **Anthropic (Claude)**：`anthropic/claude-haiku-4.5-20251001`, `anthropic/claude-opus-4.8`, `anthropic/claude-sonnet-4.6`
+- **OpenAI (GPT)**：`openai/gpt-5.4`, `openai/gpt-5.5`
+- **Google (Gemini)**：`google/gemini-3.1-flash-lite`, `google/gemini-3.1-pro-preview`, `google/gemini-3.5-flash`
+- **阿里 Qwen**：`qwen/qwen2.5-7b-instruct`, `Qwen/Qwen3-235B-A22B-Instruct-2507`, `qwen/qwen3-235b-a22b-thinking-2507`, `qwen/qwen3-30b-a3b`, `Qwen/Qwen3-30B-A3B-Instruct-2507`, `qwen/qwen3-30b-a3b-thinking-2507`, `qwen/qwen3-32b`, `qwen/qwen3-8b`, `Qwen/Qwen3-Coder`, `qwen/qwen3-coder-next`, `qwen/qwen3-max-2026-01-23`, `Qwen/Qwen3-Next-80B-A3B-Instruct`, `Qwen/Qwen3-Next-80B-A3B-Thinking`, `Qwen/Qwen3-VL-235B-A22B-Instruct`, `qwen/qwen3-vl-235b-a22b-thinking`, `qwen/qwen3-vl-30b-a3b-instruct`, `qwen/qwen3-vl-30b-a3b-thinking`, `qwen/qwen3-vl-8b-instruct`, `qwen/qwen3.5-122b-a10b`, `qwen/qwen3.5-27b`, `qwen/qwen3.5-35b-a3b`, `qwen/qwen3.5-397b-a17b`, `qwen/qwen3.6-35b-a3b`, `qwen/qwen3.6-plus`
+- **DeepSeek**：`deepseek-ai/deepseek-ocr`, `deepseek-ai/deepseek-r1-0528`, `deepseek-ai/DeepSeek-V3-0324`, `deepseek-ai/DeepSeek-V3.1`, `deepseek-ai/DeepSeek-V3.1-Terminus`, `deepseek-ai/deepseek-v3.2`, `deepseek-ai/DeepSeek-V3.2-Exp`, `deepseek-ai/deepseek-v4-flash`, `deepseek-ai/deepseek-v4-pro`
+- **Moonshot (Kimi)**：`moonshotai/Kimi-K2-Instruct`, `moonshotai/Kimi-K2-Instruct-0905`, `moonshotai/Kimi-K2-Thinking`, `moonshotai/kimi-k2.5`, `moonshotai/kimi-k2.6`
+- **智谱 GLM**：`zai-org/GLM-4.6`, `zai-org/glm-4.7`, `zai-org/glm-5`, `zai-org/glm-5-turbo`, `zai-org/glm-5.1`, `zai-org/glm-5v-turbo`
+- **MiniMax**：`MiniMaxAI/MiniMax-M2`, `minimaxai/minimax-m2.1`, `minimaxai/minimax-m2.5`, `minimaxai/minimax-m2.7`
+- **xAI (Grok)**：`xai/grok-4.3`
+- **快手 KAT**：`kwaipilot/kat-coder-pro-v2`
+- **其他**：`owl`
+
+</details>
+
 ## Docker 部署
 
 ### 快速启动
@@ -98,7 +154,7 @@ docker run -d \
   twwch/aicomicbuilder:latest
 ```
 
-启动后在设置页面中配置 AI 模型供应商（OpenAI / Gemini / Seedance）。
+启动后在设置页面中配置 AI 模型供应商（OpenAI / Gemini / Seedance / Atlas Cloud 等）。
 
 ### Docker Compose
 

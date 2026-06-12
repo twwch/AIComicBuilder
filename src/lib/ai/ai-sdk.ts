@@ -12,7 +12,9 @@ export interface ProviderConfig {
 
 export function createLanguageModel(config: ProviderConfig): LanguageModel {
   switch (config.protocol) {
-    case "openai": {
+    case "openai":
+    case "atlascloud": {
+      // Atlas Cloud LLM is OpenAI-compatible (base URL https://api.atlascloud.ai/v1).
       const provider = createOpenAI({
         apiKey: config.apiKey,
         baseURL: config.baseUrl,
