@@ -1,6 +1,7 @@
 import type { VideoProvider, VideoGenerateParams, VideoGenerateResult } from "../types";
-import fs from "node:fs";
+import fs, { createWriteStream } from "node:fs";
 import path from "node:path";
+import { pipeline } from "node:stream/promises";
 import { id as genId } from "@/lib/id";
 
 function toDataUrl(filePath: string): string {
@@ -46,7 +47,7 @@ export class UCloudSeedanceProvider implements VideoProvider {
     model?: string;
     uploadDir?: string;
   }) {
-    this.apiKey = params?.apiKey || "";
+    this.apiKey = params?.apiKey || process.env.UCLOUD_API_KEY || "";
     this.baseUrl = (
       params?.baseUrl || "https://api.modelverse.cn"
     ).replace(/\/+$/, "");
@@ -70,6 +71,7 @@ export class UCloudSeedanceProvider implements VideoProvider {
         Authorization: this.apiKey,
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60_000),
     });
 
     if (!submitResponse.ok) {
@@ -88,13 +90,12 @@ export class UCloudSeedanceProvider implements VideoProvider {
 
     const videoUrl = await this.pollForResult(taskId);
 
-    const videoResponse = await fetch(videoUrl);
-    const buffer = Buffer.from(await videoResponse.arrayBuffer());
+    const videoResponse = await fetch(videoUrl, { signal: AbortSignal.timeout(120_000) });
     const filename = `${genId()}.mp4`;
     const dir = path.join(this.uploadDir, "videos");
     fs.mkdirSync(dir, { recursive: true });
     const filepath = path.join(dir, filename);
-    fs.writeFileSync(filepath, buffer);
+    await pipeline(videoResponse.body! as any, createWriteStream(filepath));
 
     return { filePath: filepath };
   }
@@ -184,7 +185,7 @@ export class UCloudSeedanceProvider implements VideoProvider {
 
       const res = await fetch(
         `${this.baseUrl}/v1/tasks/status?task_id=${encodeURIComponent(taskId)}`,
-        { headers: { Authorization: this.apiKey } }
+        { headers: { Authorization: this.apiKey }, signal: AbortSignal.timeout(30_000) }
       );
 
       if (!res.ok) {

@@ -19,7 +19,11 @@ export type ShotAssetType =
   | "last_frame"
   | "reference"
   | "keyframe_video"
-  | "reference_video";
+  | "reference_video"
+  | "panel_1"
+  | "panel_2"
+  | "panel_3"
+  | "panel_4";
 
 export type ShotAssetStatus =
   | "pending"
@@ -41,6 +45,7 @@ export interface ShotAssetRow {
   modelProvider: string | null;
   modelId: string | null;
   meta: Record<string, unknown> | null;
+  generationId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +65,7 @@ function rowToAsset(row: typeof shotAssets.$inferSelect): ShotAssetRow {
     modelProvider: row.modelProvider,
     modelId: row.modelId,
     meta: row.meta ? JSON.parse(row.meta) : null,
+    generationId: row.generationId ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -136,6 +142,7 @@ export interface UpsertAssetInput {
   modelProvider?: string | null;
   modelId?: string | null;
   meta?: Record<string, unknown> | null;
+  generationId?: string | null;
 }
 
 /**
@@ -214,6 +221,7 @@ export async function insertAssetVersion(
     modelProvider: input.modelProvider ?? null,
     modelId: input.modelId ?? null,
     meta: resolvedMeta,
+    generationId: input.generationId ?? null,
     createdAt: now,
     updatedAt: now,
   };
@@ -232,6 +240,7 @@ export async function patchAsset(
     modelProvider: string | null;
     modelId: string | null;
     meta: Record<string, unknown> | null;
+    generationId: string | null;
   }>
 ): Promise<void> {
   const update: Record<string, unknown> = { updatedAt: new Date() };
@@ -243,6 +252,8 @@ export async function patchAsset(
   if (patch.modelId !== undefined) update.modelId = patch.modelId;
   if (patch.meta !== undefined)
     update.meta = patch.meta ? JSON.stringify(patch.meta) : null;
+  if (patch.generationId !== undefined)
+    update.generationId = patch.generationId;
   await db.update(shotAssets).set(update).where(eq(shotAssets.id, assetId));
 }
 
@@ -303,6 +314,8 @@ export interface ShotLegacyView {
   sceneRefFrame: string | null;
   /** All active reference image assets, ordered by sequence_in_type */
   referenceImages: ShotAssetRow[];
+  /** 4-grid panel image URLs (index 0–3, null if not present) */
+  panels: [string | null, string | null, string | null, string | null];
 }
 
 export async function loadShotLegacyView(shotId: string): Promise<ShotLegacyView> {
@@ -335,15 +348,20 @@ export async function loadShotLegacyView(shotId: string): Promise<ShotLegacyView
   // reference anchor — map it to the first reference asset (sequence_in_type=0).
   const sceneRefAsset = referenceImages[0];
 
+  const panelAssets = [1, 2, 3, 4].map((i) =>
+    all.find((a) => a.type === `panel_${i}` as ShotAssetType && a.sequenceInType === 0)
+  );
+
   return {
     firstFrame: firstFrameAsset?.fileUrl ?? null,
     lastFrame: lastFrameAsset?.fileUrl ?? null,
-    startFrameDesc: firstFrameAsset?.prompt ?? null,
-    endFrameDesc: lastFrameAsset?.prompt ?? null,
+    startFrameDesc: firstFrameAsset?.prompt ?? panelAssets[0]?.prompt ?? null,
+    endFrameDesc: lastFrameAsset?.prompt ?? panelAssets[3]?.prompt ?? null,
     videoUrl: keyframeVideoAsset?.fileUrl ?? null,
     referenceVideoUrl: referenceVideoAsset?.fileUrl ?? null,
     sceneRefFrame: sceneRefAsset?.fileUrl ?? null,
     referenceImages,
+    panels: panelAssets.map((a) => a?.fileUrl ?? null) as [string | null, string | null, string | null, string | null],
   };
 }
 
@@ -387,15 +405,19 @@ export async function loadShotLegacyViewsBatch(
       .filter((a) => a.type === "reference")
       .sort((a, b) => a.sequenceInType - b.sequenceInType);
     const sceneRefAsset = referenceImages[0];
+    const panelAssets = [1, 2, 3, 4].map((i) =>
+      all.find((a) => a.type === `panel_${i}` as ShotAssetType && a.sequenceInType === 0)
+    );
     result.set(shotId, {
       firstFrame: firstFrameAsset?.fileUrl ?? null,
       lastFrame: lastFrameAsset?.fileUrl ?? null,
-      startFrameDesc: firstFrameAsset?.prompt ?? null,
-      endFrameDesc: lastFrameAsset?.prompt ?? null,
+      startFrameDesc: firstFrameAsset?.prompt ?? panelAssets[0]?.prompt ?? null,
+      endFrameDesc: lastFrameAsset?.prompt ?? panelAssets[3]?.prompt ?? null,
       videoUrl: keyframeVideoAsset?.fileUrl ?? null,
       referenceVideoUrl: referenceVideoAsset?.fileUrl ?? null,
       sceneRefFrame: sceneRefAsset?.fileUrl ?? null,
       referenceImages,
+      panels: panelAssets.map((a) => a?.fileUrl ?? null) as [string | null, string | null, string | null, string | null],
     });
   }
   return result;

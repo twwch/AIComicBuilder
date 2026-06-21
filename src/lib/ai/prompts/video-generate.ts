@@ -68,31 +68,59 @@ function resolveSlot(
   return hardcodedFallback;
 }
 
-/**
- * Prompt for reference-image-based video generation (Toonflow/Kling reference mode).
- * Seedance-style format: Shot description (prose) → Camera → 【对白口型】.
- * No frame interpolation header, no [FRAME ANCHORS] — the reference image provides visual context.
- */
 export function buildReferenceVideoPrompt(params: {
   videoScript: string;
   cameraDirection: string;
   duration?: number;
   characters?: CharacterRef[];
   dialogues?: Array<{ characterName: string; text: string; offscreen?: boolean; visualHint?: string }>;
+  visualStyle?: string;
+  family?: "ltx" | "wan" | "seedance" | "generic";
   slotContents?: Record<string, string>;
+  previousShotSummary?: string;
 }): string {
   const lang = detectLanguage(params.videoScript);
   const L = getLabels(lang);
   const lines: string[] = [];
 
   if (params.duration) {
-    lines.push(`${L.duration}${L.colon}${params.duration}s${L.period}`);
+    const capped = Math.min(params.duration, 15);
+    lines.push(`${L.duration}${L.colon}${capped}s${L.period}`);
+    lines.push(``);
+  }
+
+  if (params.previousShotSummary) {
+    const hook = resolveSlot(params.slotContents, "ref_video_generate", "continuity_hook", "");
+    if (hook.includes("[描述]")) {
+      lines.push(hook.replace("[描述]", params.previousShotSummary));
+    } else {
+      lines.push(`${lang === "zh" ? "前情" : "Previous shot"}${L.colon}${params.previousShotSummary}${L.period}`);
+    }
     lines.push(``);
   }
 
   const charLine = buildCharacterLine(params.characters, lang);
   if (charLine) {
     lines.push(`${L.characterAppearance}${L.colon}${charLine}${L.period}`);
+    lines.push(``);
+  }
+
+  if (params.visualStyle) {
+    lines.push(`${lang === "zh" ? "视觉风格" : "Visual Style"}${L.colon}${params.visualStyle}${L.period}`);
+    lines.push(``);
+  }
+
+  if (params.family === "wan") {
+    lines.push(lang === "zh"
+      ? "写作策略：保持主体稳定，动作单线推进，避免复杂跳切和多重视角突变。"
+      : "Writing strategy: keep the subject stable, use one continuous action line, avoid complex jump cuts and abrupt perspective changes.");
+    lines.push(``);
+  }
+
+  if (params.family === "seedance") {
+    lines.push(lang === "zh"
+      ? "写作策略：更像电影分镜散文，镜头运动、情绪外化和环境反应要具体，但整体保持自然流动。"
+      : "Writing strategy: cinematic storyboard prose, with concrete camera motion, emotional externalization, and environmental reactions while staying naturally flowing.");
     lines.push(``);
   }
 
@@ -130,23 +158,43 @@ export function buildReferenceVideoPrompt(params: {
   return lines.join("\n");
 }
 
+export type SegmentContext = {
+  index: number;
+  total: number;
+};
+
 export function buildVideoPrompt(params: {
   videoScript: string;
   cameraDirection: string;
   startFrameDesc?: string;
   endFrameDesc?: string;
-  sceneDescription?: string;       // kept for call-site compatibility, not used in output
+  sceneDescription?: string;
   duration?: number;
   characters?: CharacterRef[];
   dialogues?: Array<{ characterName: string; text: string; offscreen?: boolean; visualHint?: string }>;
+  visualStyle?: string;
+  family?: "ltx" | "wan" | "seedance" | "generic";
   slotContents?: Record<string, string>;
+  segmentContext?: SegmentContext;
+  previousShotSummary?: string;
 }): string {
   const lang = detectLanguage(params.videoScript);
   const L = getLabels(lang);
   const lines: string[] = [];
 
   if (params.duration) {
-    lines.push(`${L.duration}${L.colon}${params.duration}s${L.period}`);
+    const capped = Math.min(params.duration, 15);
+    lines.push(`${L.duration}${L.colon}${capped}s${L.period}`);
+    lines.push(``);
+  }
+
+  if (params.previousShotSummary) {
+    const hook = resolveSlot(params.slotContents, "video_generate", "continuity_hook", "");
+    if (hook.includes("[描述]")) {
+      lines.push(hook.replace("[描述]", params.previousShotSummary));
+    } else {
+      lines.push(`${lang === "zh" ? "前情" : "Previous shot"}${L.colon}${params.previousShotSummary}${L.period}`);
+    }
     lines.push(``);
   }
 
@@ -156,27 +204,46 @@ export function buildVideoPrompt(params: {
     lines.push(``);
   }
 
-  // Interpolation header from slot or registry default
-  const defaultInterpolation = lang === "zh"
-    ? "从起始帧到结束帧进行平滑插值。"
-    : "Smoothly interpolate from the opening frame to the closing frame.";
-  const interpolationHeader = resolveSlot(
-    params.slotContents,
-    "video_generate",
-    "interpolation_header",
-    defaultInterpolation
-  );
-  lines.push(interpolationHeader);
-  lines.push(``);
+  if (params.visualStyle) {
+    lines.push(`${lang === "zh" ? "视觉风格" : "Visual Style"}${L.colon}${params.visualStyle}${L.period}`);
+    lines.push(``);
+  }
+
+  if (params.family === "wan") {
+    lines.push(lang === "zh"
+      ? "写作策略：主体稳定，动作单线推进，避免复杂跳切和大幅视角切换。"
+      : "Writing strategy: keep the subject stable, use a single continuous action line, avoid complex jump cuts and large perspective changes.");
+    lines.push(``);
+  }
+
+  if (params.family === "seedance") {
+    lines.push(lang === "zh"
+      ? "写作策略：使用更自然的分镜散文表达，镜头运动、环境反应与情绪节拍要清晰具体。"
+      : "Writing strategy: use more natural storyboard prose, with clear camera motion, environmental reactions, and emotional beats.");
+    lines.push(``);
+  }
+
+  // Interpolation header — short and clean for video model input
+  if (params.segmentContext && params.segmentContext.total > 1) {
+    const seg = params.segmentContext;
+    const header = lang === "zh"
+      ? `【第${seg.index + 1}段/共${seg.total}段】`
+      : `[Segment ${seg.index + 1}/${seg.total}]`;
+    lines.push(header);
+    lines.push(``);
+  }
 
   lines.push(params.videoScript);
 
   lines.push(``);
   lines.push(`${L.camera}${L.colon}${params.cameraDirection}${L.period}`);
 
-  const hasStart = !!params.startFrameDesc;
+  // For non-first segments, omit startFrameDesc (mid-point has no meaningful start description)
+  const showStartFrame = params.segmentContext
+    ? params.segmentContext.index === 0 && !!params.startFrameDesc
+    : !!params.startFrameDesc;
   const hasEnd = !!params.endFrameDesc;
-  if (hasStart || hasEnd) {
+  if (showStartFrame || hasEnd) {
     // Resolve frame_anchors slot for label text
     const frameAnchorsText = resolveSlot(
       params.slotContents,
@@ -195,7 +262,7 @@ export function buildVideoPrompt(params: {
 
     lines.push(``);
     lines.push(anchorHeader);
-    if (hasStart) lines.push(`${openingLabel} ${params.startFrameDesc}`);
+    if (showStartFrame) lines.push(`${openingLabel} ${params.startFrameDesc}`);
     if (hasEnd) lines.push(`${closingLabel} ${params.endFrameDesc}`);
   }
 

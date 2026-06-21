@@ -14,7 +14,8 @@ interface ResolveOptions {
  */
 export async function resolvePrompt(
   promptKey: string,
-  options: ResolveOptions
+  options: ResolveOptions,
+  params?: Record<string, unknown>
 ): Promise<string> {
   const def = getPromptDefinition(promptKey);
   if (!def) {
@@ -82,7 +83,7 @@ export async function resolvePrompt(
     }
   }
 
-  return def.buildFullPrompt(slotContents);
+  return def.buildFullPrompt(slotContents, params);
 }
 
 /**

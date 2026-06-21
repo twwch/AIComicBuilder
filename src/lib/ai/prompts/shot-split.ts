@@ -244,7 +244,8 @@ export function buildShotSplitPrompt(
   characters: string,
   characterVisualHints?: Array<{ name: string; visualHint: string }>,
   colorPalette?: string,
-  characterPerformanceStyles?: Array<{ name: string; performanceStyle: string }>
+  characterPerformanceStyles?: Array<{ name: string; performanceStyle: string }>,
+  visualStyleReference?: string,
 ): string {
   const hintBlock = characterVisualHints?.length
     ? `\n--- 角色视觉标识（必须使用）---\n${characterVisualHints.map((c) => `${c.name}：${c.visualHint}`).join("\n")}\n--- 结束 ---\n\n关键要求：当角色出现在 videoScript、motionScript、startFrame 或 endFrame 中时，必须在角色名后用括号标注视觉标识，且必须完全使用上方提供的原文。示例：天枢真君（银发金瞳）。绝不自行编造替代描述——始终复用上方提供的准确标识文本。`
@@ -262,5 +263,5 @@ ${characters}
 ${hintBlock}
 重要：引用角色时使用其准确名称，确保 startFrame/endFrame 中的视觉描述与上方的角色参考一致。${characterPerformanceStyles?.length ? `\n\n--- 角色表演风格 ---\n${characterPerformanceStyles.map((c) => `${c.name}：${c.performanceStyle}`).join("\n")}\n--- 结束 ---\n\n使用每个角色的表演风格来指导其在 startFrame、endFrame 和 motionScript 中的表情、姿势和手势。` : ""}
 
-重要：你的输出语言必须与上方剧本的语言一致。如果是中文剧本，则所有字段使用中文（cameraDirection 除外）。${colorPalette ? `\n\n## 全局色彩方案\n所有镜头必须使用此色彩方案：${colorPalette}。场景描述的色彩应与此调色板一致。\n` : ""}`;
+重要：你的输出语言必须与上方剧本的语言一致。如果是中文剧本，则所有字段使用中文（cameraDirection 除外）。${colorPalette ? `\n\n## 全局色彩方案\n所有镜头必须使用此色彩方案：${colorPalette}。场景描述的色彩应与此调色板一致。\n` : ""}${visualStyleReference ? `\n\n## 视觉风格参考（最高优先级）\n所有镜头必须显式遵循这个风格：${visualStyleReference}。请在 startFrame、endFrame、videoScript 和整体镜头调性中持续体现该风格，不要弱化、替换或忽略。\n` : ""}`;
 }

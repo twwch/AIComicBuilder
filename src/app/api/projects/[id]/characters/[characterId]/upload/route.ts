@@ -6,6 +6,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { id as genId } from "@/lib/id";
 import { assertProjectOwnership } from "@/lib/assert-project-ownership";
+import { extractCharacterReferencePortrait } from "@/lib/character-ref-utils";
+import type { CharacterReferenceLayout } from "@/lib/ai/prompts/registry-character";
 
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 
@@ -52,9 +54,31 @@ export async function POST(
     history.push(filepath);
   }
 
+  // Auto-crop a single-portrait ref so downstream keyframe generation can
+  // skip the multi-view sheet (which confuses the image model into
+  // reproducing the contact-sheet layout). Mirrors what the AI generation
+  // handler does. On crop failure (e.g. all-white image), keep the
+  // existing single portrait.
+  let singlePortraitPath: string | null = null;
+  const layout = (character.referenceLayout ?? "four-view") as CharacterReferenceLayout;
+  if (layout !== "single") {
+    try {
+      singlePortraitPath = await extractCharacterReferencePortrait(filepath, layout);
+    } catch (cropErr) {
+      console.warn(
+        `[CharacterUpload] auto-crop failed for ${character.name}:`,
+        cropErr instanceof Error ? cropErr.message : cropErr,
+      );
+    }
+  }
+
   const [updated] = await db
     .update(characters)
-    .set({ referenceImage: filepath, referenceImageHistory: JSON.stringify(history) })
+    .set({
+      referenceImage: filepath,
+      referenceImageHistory: JSON.stringify(history),
+      referenceImageSingle: singlePortraitPath ?? character.referenceImageSingle,
+    })
     .where(eq(characters.id, characterId))
     .returning();
 

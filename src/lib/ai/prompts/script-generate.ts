@@ -12,14 +12,26 @@ function detectLanguage(text: string): string {
   return "English";
 }
 
+function extractVisualStyleReference(idea: string): string {
+  const line = idea
+    .split(/\r?\n/)
+    .find((entry) => entry.trim().startsWith("视觉风格参考："));
+  return line?.split("：").slice(1).join("：").trim() ?? "";
+}
+
 export function buildScriptGeneratePrompt(idea: string): string {
   const lang = detectLanguage(idea);
+  const visualStyleReference = extractVisualStyleReference(idea);
 
   return `Write a complete, production-ready screenplay based on this creative concept:
 
 "${idea}"
 
 OUTPUT LANGUAGE: ${lang}. You MUST write EVERY word of your output in ${lang}, including all section headers, character descriptions, stage directions, and dialogue. Do NOT use English if the language is not English.
+
+${visualStyleReference ? `VISUAL STYLE REFERENCE: ${visualStyleReference}. This style reference is explicit user intent and should be written into Section 1 视觉风格 clearly, not ignored or weakened.
+
+` : ""} 
 
 **STRICT FORMAT REMINDER** (details are in the system prompt — do not violate):
 - Sections 1 (视觉风格) and 2 (角色描述) are machine-readable key:value blocks with fixed Chinese field labels. No markdown, no bullets, no code fences. One field per line.

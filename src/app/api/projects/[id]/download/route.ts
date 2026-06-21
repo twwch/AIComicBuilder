@@ -7,6 +7,8 @@ import fs from "node:fs";
 import { loadShotLegacyViewsBatch } from "@/lib/shot-asset-utils";
 import { getUserIdFromRequest } from "@/lib/get-user-id";
 
+const uploadDir = path.resolve(process.env.UPLOAD_DIR || "./uploads");
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -44,9 +46,10 @@ export async function GET(
   const chunks: Uint8Array[] = [];
   archive.on("data", (chunk: Buffer) => chunks.push(chunk));
 
-  // Helper: add file to archive if it exists
+  // Helper: add file to archive if it exists and is within allowed directory
   function addFile(srcPath: string, archiveName: string) {
     const abs = path.resolve(srcPath);
+    if (!abs.startsWith(uploadDir)) return false;
     if (fs.existsSync(abs)) {
       archive.file(abs, { name: archiveName });
       return true;

@@ -17,6 +17,10 @@ export async function POST(
   }
   const body = await req.json();
 
+  if (!body.modelConfig?.text) {
+    return NextResponse.json({ error: "modelConfig.text is required for continuity check" }, { status: 400 });
+  }
+
   const allShots = await db
     .select()
     .from(shots)
@@ -51,17 +55,27 @@ export async function POST(
     const next = shotsWithFrames[i + 1];
 
     if (current.lastFrame && next.firstFrame) {
-      const result = await checkContinuity(
-        provider,
-        current.lastFrame,
-        next.firstFrame
-      );
-      results.push({
-        shotASequence: current.sequence,
-        shotBSequence: next.sequence,
-        pass: result.pass,
-        issues: result.issues,
-      });
+      try {
+        const result = await checkContinuity(
+          provider,
+          current.lastFrame,
+          next.firstFrame
+        );
+        results.push({
+          shotASequence: current.sequence,
+          shotBSequence: next.sequence,
+          pass: result.pass,
+          issues: result.issues,
+        });
+      } catch (err) {
+        console.warn(`[ContinuityCheck] Failed for shot ${current.sequence} → ${next.sequence}:`, err);
+        results.push({
+          shotASequence: current.sequence,
+          shotBSequence: next.sequence,
+          pass: true,
+          issues: [`检查失败: ${err instanceof Error ? err.message : String(err)}`],
+        });
+      }
     }
   }
 

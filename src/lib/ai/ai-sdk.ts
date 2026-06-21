@@ -25,6 +25,17 @@ export function createLanguageModel(config: ProviderConfig): LanguageModel {
       });
       return provider(config.modelId);
     }
+    case "sensenova":
+    case "dashscope":
+    case "siliconflow":
+    case "nvidia":
+    case "agnes": {
+      const provider = createOpenAI({
+        apiKey: config.apiKey,
+        baseURL: config.baseUrl,
+      });
+      return provider.chat(config.modelId);
+    }
     default:
       throw new Error(`Unsupported protocol: ${config.protocol}`);
   }
@@ -36,6 +47,20 @@ export function createLanguageModel(config: ProviderConfig): LanguageModel {
 export function extractJSON(text: string): string {
   const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const raw = match ? match[1].trim() : text.trim();
-  // Remove control characters that break JSON.parse (except \n \r \t)
-  return raw.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
+  const cleaned = raw.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
+
+  // Fast path: already valid-looking JSON.
+  if (cleaned.startsWith("{") || cleaned.startsWith("[")) {
+    return cleaned;
+  }
+
+  // Fallback: some models prepend explanatory prose before the JSON payload.
+  const firstObject = cleaned.indexOf("{");
+  const firstArray = cleaned.indexOf("[");
+  const candidates = [firstObject, firstArray].filter((i) => i >= 0).sort((a, b) => a - b);
+  if (candidates.length > 0) {
+    return cleaned.slice(candidates[0]).trim();
+  }
+
+  return cleaned;
 }

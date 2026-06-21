@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, use } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Users, ArrowLeft, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { CharacterCard } from "@/components/editor/character-card";
 import { CharacterRelations } from "@/components/editor/character-relations";

@@ -46,11 +46,15 @@ export function InlineModelPicker({ capability, value: controlledValue, onChange
   const containerRef = useRef<HTMLDivElement>(null);
 
   const options = useMemo(() => {
+    const seen = new Set<string>();
     const result: { providerId: string; providerName: string; modelId: string; modelName: string }[] = [];
     for (const p of providers) {
       if (p.capability !== capability) continue;
       for (const m of p.models) {
         if (!m.checked) continue;
+        const key = `${p.id}:${m.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
         result.push({
           providerId: p.id,
           providerName: p.name,
@@ -62,10 +66,15 @@ export function InlineModelPicker({ capability, value: controlledValue, onChange
     return result;
   }, [providers, capability]);
 
-  // Auto-select first option if nothing is selected (only in uncontrolled mode)
+  // Auto-select first option if nothing is selected, or if current selection is stale
   useEffect(() => {
-    if (!isControlled && !value && options.length > 0) {
-      globalSetter({ providerId: options[0].providerId, modelId: options[0].modelId } as ModelRef);
+    if (isControlled) return;
+    const currentKey = value ? `${value.providerId}:${value.modelId}` : null;
+    const validKeys = new Set(options.map((o) => `${o.providerId}:${o.modelId}`));
+    if (!currentKey || !validKeys.has(currentKey)) {
+      if (options.length > 0) {
+        globalSetter({ providerId: options[0].providerId, modelId: options[0].modelId } as ModelRef);
+      }
     }
   }, [isControlled, value, options, globalSetter]);
 

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateText } from "ai";
 import { createLanguageModel, extractJSON } from "@/lib/ai/ai-sdk";
-import type { ProviderConfig } from "@/lib/ai/ai-sdk";
 import { db } from "@/lib/db";
 import { projects, episodes } from "@/lib/db/schema";
 import { eq, and, max } from "drizzle-orm";
@@ -9,6 +8,7 @@ import { getUserIdFromRequest } from "@/lib/get-user-id";
 import { id as genId } from "@/lib/id";
 import { buildScriptSplitPrompt } from "@/lib/ai/prompts/script-split";
 import { resolvePrompt } from "@/lib/ai/prompts/resolver";
+import { UploadModelConfigSchema, parseOrThrow } from "@/lib/validation";
 
 export const maxDuration = 300;
 
@@ -116,16 +116,17 @@ export async function POST(
     );
   }
 
-  const modelConfig = JSON.parse(modelConfigRaw) as {
-    text: ProviderConfig | null;
-  };
-
-  if (!modelConfig.text) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(modelConfigRaw);
+  } catch {
     return NextResponse.json(
-      { error: "No text model configured" },
+      { error: "Invalid model config JSON" },
       { status: 400 }
     );
   }
+
+  const modelConfig = parseOrThrow(UploadModelConfigSchema, parsed);
 
   // Extract text from file
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -150,7 +151,7 @@ export async function POST(
   const scriptSplitSystem = await resolvePrompt("script_split", { userId, projectId });
 
   // Process all chunks concurrently
-  let episodeOffset = 0;
+  const episodeOffset = 0;
   const chunkPromises = chunks.map(async (chunk, idx) => {
     const prompt = buildScriptSplitPrompt(chunk, {
       chunkIndex: idx,
@@ -188,23 +189,17 @@ export async function POST(
 
   let seq = (seqResult?.maxSeq ?? 0) + 1;
 
-  // Create all episodes in DB
-  const created = [];
-  for (const ep of allEpisodes) {
-    const [row] = await db
-      .insert(episodes)
-      .values({
-        id: genId(),
-        projectId,
-        title: ep.title,
-        description: ep.description || "",
-        keywords: ep.keywords || "",
-        idea: ep.idea || "",
-        sequence: seq++,
-      })
-      .returning();
-    created.push(row);
-  }
+  // Create all episodes in DB via batch insert
+  const episodeRows = allEpisodes.map((ep) => ({
+    id: genId(),
+    projectId,
+    title: ep.title,
+    description: ep.description || "",
+    keywords: ep.keywords || "",
+    idea: ep.idea || "",
+    sequence: seq++,
+  }));
+  const created = await db.insert(episodes).values(episodeRows).returning();
 
   console.log(
     `[UploadScript] Created ${created.length} episodes from ${chunks.length} chunks`

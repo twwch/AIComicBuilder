@@ -3,11 +3,16 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { useProjectStore } from "@/stores/project-store";
 import { useModelStore } from "@/stores/model-store";
+import { STYLE_PRESETS, extractVisualStyleReference, extractVisualStyleValue, findStylePresetIdByReference, formatStylePreset } from "@/lib/style-presets";
 import { useTranslations } from "next-intl";
 import { Sparkles, Loader2, FileText, Lightbulb, ListOrdered } from "lucide-react";
 import { InlineModelPicker } from "@/components/editor/model-selector";
+import { VideoModelStrategyBadge } from "@/components/editor/video-model-strategy-badge";
+import { VisualStyleBadge } from "@/components/editor/visual-style-badge";
 import { AgentPicker } from "@/components/agent-picker";
 import { apiFetch } from "@/lib/api-fetch";
 import { useModelGuard } from "@/hooks/use-model-guard";
@@ -22,8 +27,33 @@ export function ScriptEditor() {
   const [generating, setGenerating] = useState(false);
   const [generatingOutline, setGeneratingOutline] = useState(false);
   const [outline, setOutline] = useState(project?.outline || "");
+  const [selectedStyleId, setSelectedStyleId] = useState(STYLE_PRESETS[0]?.id ?? "");
   const textGuard = useModelGuard("text");
   const scriptTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function applyStylePreset() {
+    const selected = STYLE_PRESETS.find((style) => style.id === selectedStyleId);
+    if (!selected || !project) return;
+    const styleLine = `视觉风格参考：${formatStylePreset(selected)}`;
+    const existing = project.idea || "";
+    const lines = existing.split(/\r?\n/);
+    const idx = lines.findIndex((line) => line.startsWith("视觉风格参考："));
+    const next = idx >= 0
+      ? lines.map((line, i) => (i === idx ? styleLine : line)).join("\n")
+      : `${existing.trim()}${existing.trim() ? "\n\n" : ""}${styleLine}`;
+    updateIdea(next);
+
+    if (project.script) {
+      const scriptLines = project.script.split(/\r?\n/);
+      const scriptStyleLine = `视觉风格：${formatStylePreset(selected)}`;
+      const scriptIdx = scriptLines.findIndex((line) => line.startsWith("视觉风格："));
+      if (scriptIdx >= 0) {
+        updateScript(scriptLines.map((line, i) => (i === scriptIdx ? scriptStyleLine : line)).join("\n"));
+      }
+    }
+
+    scheduleSave();
+  }
 
   // Sync outline from project when project data changes
   useEffect(() => {
@@ -85,6 +115,15 @@ export function ScriptEditor() {
 
   if (!project) return null;
 
+  const currentVisualStyle = extractVisualStyleReference(project.idea) || extractVisualStyleValue(project.script);
+
+  useEffect(() => {
+    const matchedId = findStylePresetIdByReference(currentVisualStyle);
+    if (matchedId && matchedId !== selectedStyleId) {
+      setSelectedStyleId(matchedId);
+    }
+  }, [currentVisualStyle, selectedStyleId]);
+
   function handleSave() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     persistNow();
@@ -131,8 +170,9 @@ export function ScriptEditor() {
 
       await fetchProject(project.id, currentEpisodeId ?? undefined);
     } catch (err) {
-      console.error("Outline generate error:", err);
-      toast.error(t("common.generationFailed"));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Outline generate error:", msg);
+      toast.error(msg.includes("余额") || msg.includes("quota") || msg.includes("insufficient") ? msg : t("common.generationFailed"));
     } finally {
       setGeneratingOutline(false);
     }
@@ -222,8 +262,9 @@ export function ScriptEditor() {
 
       await fetchProject(project.id, currentEpisodeId ?? undefined);
     } catch (err) {
-      console.error("Script generate error:", err);
-      toast.error(t("common.generationFailed"));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Script generate error:", msg);
+      toast.error(msg.includes("余额") || msg.includes("quota") || msg.includes("insufficient") ? msg : t("common.generationFailed"));
     }
 
     setGeneratingOutline(false);
@@ -241,9 +282,24 @@ export function ScriptEditor() {
           <h2 className="font-display text-xl font-bold tracking-tight text-[--text-primary]">
             {t("project.script")}
           </h2>
+          <VisualStyleBadge idea={project.idea} script={project.script} />
+          <VideoModelStrategyBadge />
         </div>
         <div className="flex items-center gap-2">
           <PromptEditButton promptKeys={["script_outline", "script_generate"]} projectId={project.id} />
+          <Select value={selectedStyleId} onValueChange={setSelectedStyleId}>
+            <SelectTrigger size="sm" className="max-w-64" />
+            <SelectContent>
+              {STYLE_PRESETS.map((style) => (
+                <SelectItem key={style.id} value={style.id}>
+                  {formatStylePreset(style)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="outline" onClick={applyStylePreset}>
+            插入风格
+          </Button>
           <InlineModelPicker capability="text" />
           {saving && (
             <span className="flex items-center gap-1.5 text-xs text-[--text-muted]">
@@ -252,6 +308,9 @@ export function ScriptEditor() {
             </span>
           )}
         </div>
+      </div>
+      <div className="-mt-3">
+        <VideoModelStrategyBadge showLabel={false} showHint />
       </div>
 
       {/* Idea input */}

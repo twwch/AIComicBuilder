@@ -4,6 +4,7 @@ import { projects } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { id as genId } from "@/lib/id";
 import { getUserIdFromRequest } from "@/lib/get-user-id";
+import { ProjectSchema, parseOrThrow } from "@/lib/validation";
 
 export async function GET(request: Request) {
   const userId = getUserIdFromRequest(request);
@@ -17,7 +18,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const userId = getUserIdFromRequest(request);
-  const body = (await request.json()) as { title: string; script?: string };
+  const raw = await request.json();
+  const body = parseOrThrow(ProjectSchema, raw);
   const id = genId();
 
   const [project] = await db
@@ -26,7 +28,7 @@ export async function POST(request: Request) {
       id,
       userId,
       title: body.title,
-      script: body.script || "",
+      script: body.script,
     })
     .returning();
 

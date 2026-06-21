@@ -11,7 +11,7 @@ export interface Episode {
   description: string | null;
   keywords: string | null;
   status: string;
-  generationMode: "keyframe" | "reference";
+  generationMode: "keyframe" | "reference" | "4grid";
   finalVideoUrl: string | null;
   previewImages?: string[];
   createdAt: string | number;

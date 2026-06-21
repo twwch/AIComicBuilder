@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 
-const STORAGE_KEY = "ai_comic_uid";
-const COOKIE_NAME = "ai_comic_uid";
+const STORAGE_KEY = "ai_comic_auth";
+const COOKIE_NAME = "ai_comic_auth";
 
 /**
  * Syncs the ai_comic_uid cookie (set by middleware on first request)

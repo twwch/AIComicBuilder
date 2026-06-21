@@ -9,8 +9,10 @@ CREATE TABLE IF NOT EXISTS agents (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_agents_user_category ON agents(user_id, category);
+
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS agent_bindings (
   id TEXT PRIMARY KEY NOT NULL,

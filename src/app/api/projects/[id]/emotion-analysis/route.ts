@@ -27,6 +27,10 @@ export async function POST(
   }
   const body = await req.json();
 
+  if (!body.modelConfig?.text) {
+    return NextResponse.json({ error: "modelConfig.text is required for emotion analysis" }, { status: 400 });
+  }
+
   const allShots = await db
     .select()
     .from(shots)

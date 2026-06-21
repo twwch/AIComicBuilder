@@ -52,8 +52,9 @@ export default function EpisodeCharactersPage() {
 
       await response.json();
     } catch (err) {
-      console.error("Character extract error:", err);
-      toast.error(t("common.generationFailed"));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Character extract error:", msg);
+      toast.error(msg.includes("余额") || msg.includes("quota") || msg.includes("insufficient") ? msg : t("common.generationFailed"));
     }
 
     setExtracting(false);
@@ -81,8 +82,9 @@ export default function EpisodeCharactersPage() {
         toast.warning(t("common.batchPartialFailed"));
       }
     } catch (err) {
-      console.error("Batch character image error:", err);
-      toast.error(t("common.generationFailed"));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Batch character image error:", msg);
+      toast.error(msg.includes("余额") || msg.includes("quota") || msg.includes("insufficient") ? msg : t("common.generationFailed"));
     }
 
     setGeneratingImages(false);

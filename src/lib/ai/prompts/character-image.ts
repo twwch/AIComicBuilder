@@ -53,3 +53,29 @@ ${characterName ? `Display the character's name "${characterName}" as a clean ty
 === FINAL OUTPUT STANDARD ===
 Professional character design reference sheet. This is the single canonical reference — all future generated frames MUST reproduce this exact character in this exact medium and style. Zero medium drift, zero style drift, zero AI artifacts.`;
 }
+
+export type ImageModelFamily = "gpt" | "agnes" | "sensenova" | "ideogram4" | "hidream" | "ernie" | "other";
+
+export function detectImageModelFamily(protocol?: string, modelId?: string): ImageModelFamily {
+  if (modelId?.includes("gpt-image")) return "gpt";
+  if (protocol === "agnes" || modelId?.includes("agnes")) return "agnes";
+  if (protocol === "sensenova" || modelId?.includes("sensenova")) return "sensenova";
+  if (protocol === "ideogram4" || modelId?.includes("ideogram4") || modelId?.includes("ideogram-4")) return "ideogram4";
+  if (modelId?.includes("hidream")) return "hidream";
+  if (modelId?.includes("ernie")) return "ernie";
+  return "other";
+}
+
+export function buildCharacterImagePrompt(
+  description: string,
+  characterName: string | undefined,
+  modelFamily: ImageModelFamily
+): string {
+  switch (modelFamily) {
+    case "agnes":
+    case "sensenova":
+      return `3D迪士尼动画风格，皮克斯式渲染，角色全身立绘，纯白背景，角色居中站立，不要出现任何文字标签。\n角色名：${characterName || ""}\n角色描述：${description || ""}`;
+    default:
+      return buildCharacterTurnaroundPrompt(description, characterName);
+  }
+}

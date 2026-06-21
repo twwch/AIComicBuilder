@@ -15,11 +15,12 @@ export default function EpisodeLayout({
 }) {
   const { id, episodeId } = use(params);
   const t = useTranslations("common");
-  const { project, loading, fetchProject } = useProjectStore();
+  const { project, loading, fetchProject, loadedProjectKey } = useProjectStore();
 
   useEffect(() => {
-    fetchProject(id, episodeId);
-  }, [id, episodeId, fetchProject]);
+    if (loadedProjectKey?.startsWith(`${id}:${episodeId}:`)) return;
+    fetchProject(id, episodeId, undefined, true);
+  }, [id, episodeId, fetchProject, loadedProjectKey]);
 
   if (loading || !project) {
     return (

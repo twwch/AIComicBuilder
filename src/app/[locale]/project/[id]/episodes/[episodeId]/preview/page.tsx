@@ -8,6 +8,7 @@ import {
   getReferenceVideoUrl,
   getSceneRefFrameUrl,
   getFirstFrameUrl,
+  getPanelUrl,
 } from "@/stores/project-store";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
@@ -45,13 +46,14 @@ export default function EpisodePreviewPage() {
 
   const finalVideoUrl = project?.finalVideoUrl ?? null;
   const generationMode = project?.generationMode ?? "keyframe";
+  type PreviewMode = "keyframe" | "reference" | "4grid";
 
   // Which mode's videos to preview — default to the project's generationMode
   const hasKeyframeVideos = project?.shots.some((s) => getKeyframeVideoUrl(s)) ?? false;
   const hasReferenceVideos = project?.shots.some((s) => getReferenceVideoUrl(s)) ?? false;
   const hasBothModes = hasKeyframeVideos && hasReferenceVideos;
 
-  const [previewMode, setPreviewMode] = useState<"keyframe" | "reference">(generationMode);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>(generationMode);
 
   // Sync previewMode when project loads
   useEffect(() => {
@@ -74,10 +76,13 @@ export default function EpisodePreviewPage() {
     previewMode === "reference" ? getReferenceVideoUrl(shot) : getKeyframeVideoUrl(shot);
 
   const getThumbnail = (shot: typeof project.shots[0]) =>
-    previewMode === "reference" ? getSceneRefFrameUrl(shot) : getFirstFrameUrl(shot);
+    previewMode === "reference"
+      ? getSceneRefFrameUrl(shot)
+      : previewMode === "4grid"
+        ? getPanelUrl(shot, 1) || getPanelUrl(shot, 2) || getPanelUrl(shot, 3) || getPanelUrl(shot, 4)
+        : getFirstFrameUrl(shot);
 
   const shotsWithVideo = project.shots.filter((s) => getVideoUrl(s));
-  const allShotsHaveVideo = project.shots.length > 0 && project.shots.every((s) => getVideoUrl(s));
   const completedVideos = shotsWithVideo.length;
   const currentShot = shotsWithVideo[selectedShot];
   const hasValidVideo = finalVideoUrl && videoValid === true;
@@ -94,8 +99,9 @@ export default function EpisodePreviewPage() {
       });
       await res.json();
     } catch (err) {
-      console.error("Video assemble error:", err);
-      toast.error(t("common.generationFailed"));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Video assemble error:", msg);
+      toast.error(msg.includes("余额") || msg.includes("quota") || msg.includes("insufficient") ? msg : t("common.generationFailed"));
     }
     setAssembling(false);
     await fetchProject(project.id, useProjectStore.getState().currentEpisodeId!);
@@ -109,7 +115,7 @@ export default function EpisodePreviewPage() {
     a.click();
   }
 
-  function handleModeSwitch(mode: "keyframe" | "reference") {
+  function handleModeSwitch(mode: PreviewMode) {
     setPreviewMode(mode);
     setSelectedShot(0);
   }
@@ -160,27 +166,29 @@ export default function EpisodePreviewPage() {
       {hasBothModes && (
         <div className="flex items-center gap-1 rounded-xl border border-[--border-subtle] bg-[--surface] p-1 w-fit">
           <button
-            onClick={() => handleModeSwitch("keyframe")}
+            onClick={() => handleModeSwitch(generationMode === "4grid" ? "4grid" : "keyframe")}
             className={cn(
               "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150",
-              previewMode === "keyframe"
+              previewMode === "keyframe" || previewMode === "4grid"
                 ? "bg-white text-primary shadow ring-1 ring-primary/20"
                 : "text-[--text-muted] hover:bg-white/60 hover:text-[--text-secondary]"
             )}
           >
-            {t("project.generationModeKeyframe")}
+            {generationMode === "4grid" ? t("project.generationMode4Grid") : t("project.generationModeKeyframe")}
           </button>
-          <button
-            onClick={() => handleModeSwitch("reference")}
-            className={cn(
-              "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150",
-              previewMode === "reference"
-                ? "bg-white text-primary shadow ring-1 ring-primary/20"
-                : "text-[--text-muted] hover:bg-white/60 hover:text-[--text-secondary]"
-            )}
-          >
-            {t("project.generationModeReference")}
-          </button>
+          {hasReferenceVideos && (
+            <button
+              onClick={() => handleModeSwitch("reference")}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150",
+                previewMode === "reference"
+                  ? "bg-white text-primary shadow ring-1 ring-primary/20"
+                  : "text-[--text-muted] hover:bg-white/60 hover:text-[--text-secondary]"
+              )}
+            >
+              {t("project.generationModeReference")}
+            </button>
+          )}
         </div>
       )}
 

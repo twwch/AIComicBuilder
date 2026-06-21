@@ -1,4 +1,4 @@
-const STORAGE_KEY = "ai_comic_uid";
+const STORAGE_KEY = "ai_comic_auth";
 
 /**
  * Read the user ID from localStorage.

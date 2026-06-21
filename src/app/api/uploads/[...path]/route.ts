@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
+import { Readable } from "node:stream";
+import { createHash } from "node:crypto";
 
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 
@@ -13,8 +15,10 @@ const MIME_TYPES: Record<string, string> = {
   ".webm": "video/webm",
 };
 
+const CACHE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path: segments } = await params;
@@ -33,9 +37,26 @@ export async function GET(
 
   const ext = path.extname(resolved).toLowerCase();
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
-  const buffer = fs.readFileSync(resolved);
+  const stat = fs.statSync(resolved);
 
-  return new NextResponse(buffer, {
-    headers: { "Content-Type": contentType },
+  // ETag based on mtime + size
+  const etag = `W/"${createHash("md5")
+    .update(`${stat.mtimeMs.toString(36)}-${stat.size.toString(36)}`)
+    .digest("hex")}"`;
+
+  if (request.headers.get("if-none-match") === etag) {
+    return new NextResponse(null, { status: 304, headers: { ETag: etag } });
+  }
+
+  const stream = fs.createReadStream(resolved);
+  const webStream = Readable.toWeb(stream) as ReadableStream<Uint8Array>;
+
+  return new NextResponse(webStream, {
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(stat.size),
+      "Cache-Control": `public, max-age=${CACHE_MAX_AGE}, immutable`,
+      ETag: etag,
+    },
   });
 }

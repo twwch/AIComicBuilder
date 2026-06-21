@@ -10,7 +10,11 @@ import { Clapperboard } from "lucide-react";
 export default async function DashboardPage() {
   const t = await getTranslations("dashboard");
   const cookieStore = await cookies();
-  const userId = cookieStore.get("ai_comic_uid")?.value ?? "";
+  const uidCookie = cookieStore.get("ai_comic_uid")?.value ?? "";
+  const authCookie = cookieStore.get("ai_comic_auth")?.value ?? "";
+  const authUid = authCookie.match(/^([a-f0-9]{32})\./i)?.[1] ?? "";
+  const cookieUid = /^[a-f0-9]{32}$/i.test(uidCookie) ? uidCookie : "";
+  const userId = authUid || cookieUid;
 
   const allProjects = userId
     ? await db

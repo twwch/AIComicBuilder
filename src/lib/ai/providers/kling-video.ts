@@ -1,6 +1,7 @@
 import type { VideoProvider, VideoGenerateParams, VideoGenerateResult } from "../types";
-import fs from "node:fs";
+import fs, { createWriteStream } from "node:fs";
 import path from "node:path";
+import { pipeline } from "node:stream/promises";
 import crypto from "node:crypto";
 import { id as genId } from "@/lib/id";
 
@@ -46,7 +47,7 @@ function toBase64(filePath: string): string {
 
 async function toBase64FromPathOrUrl(pathOrUrl: string): Promise<string> {
   if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
-    const res = await fetch(pathOrUrl);
+    const res = await fetch(pathOrUrl, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) {
       throw new Error(`Failed to fetch image: ${pathOrUrl} (${res.status})`);
     }
@@ -121,6 +122,7 @@ export class KlingVideoProvider implements VideoProvider {
           aspect_ratio: aspectRatio,
           sound: "on",
         }),
+        signal: AbortSignal.timeout(30_000),
       });
 
       if (!submitRes.ok) {
@@ -156,6 +158,7 @@ export class KlingVideoProvider implements VideoProvider {
           duration,
           aspect_ratio: aspectRatio,
         }),
+        signal: AbortSignal.timeout(30_000),
       });
 
       // Fallback: if reference_image is unsupported (400/422), retry without it
@@ -174,6 +177,7 @@ export class KlingVideoProvider implements VideoProvider {
             duration,
             aspect_ratio: aspectRatio,
           }),
+          signal: AbortSignal.timeout(30_000),
         });
       }
 
@@ -194,13 +198,12 @@ export class KlingVideoProvider implements VideoProvider {
     const videoUrl = await this.pollForResult(taskId, taskType);
 
     // Download video
-    const videoRes = await fetch(videoUrl);
-    const buffer = Buffer.from(await videoRes.arrayBuffer());
+    const videoRes = await fetch(videoUrl, { signal: AbortSignal.timeout(120_000) });
     const filename = `${genId()}.mp4`;
     const dir = path.join(this.uploadDir, "videos");
     fs.mkdirSync(dir, { recursive: true });
     const filepath = path.join(dir, filename);
-    fs.writeFileSync(filepath, buffer);
+    await pipeline(videoRes.body! as any, createWriteStream(filepath));
 
     console.log(`[Kling Video] Saved to ${filepath}`);
     return { filePath: filepath };
@@ -217,7 +220,7 @@ export class KlingVideoProvider implements VideoProvider {
 
       const res = await fetch(
         `${this.baseUrl}/v1/videos/${taskType}/${taskId}`,
-        { headers: { Authorization: this.getAuthHeader() } }
+        { headers: { Authorization: this.getAuthHeader() }, signal: AbortSignal.timeout(15_000) }
       );
 
       if (!res.ok) {

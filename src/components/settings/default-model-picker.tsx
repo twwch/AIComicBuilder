@@ -81,6 +81,7 @@ export function DefaultModelPicker() {
   } = useModelStore();
 
   function getOptions(capability: string) {
+    const seen = new Set<string>();
     const result: {
       providerId: string;
       providerName: string;
@@ -91,6 +92,9 @@ export function DefaultModelPicker() {
       if (p.capability !== capability) continue;
       for (const m of p.models) {
         if (!m.checked) continue;
+        const key = `${p.id}:${m.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
         result.push({
           providerId: p.id,
           providerName: p.name,

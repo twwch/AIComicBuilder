@@ -15,12 +15,23 @@ import { Loader2, Download, Plus, Eye, EyeOff, Trash2, Search } from "lucide-rea
 
 const DEFAULT_BASE_URLS: Record<Protocol, string> = {
   openai: "https://api.openai.com",
+  asxs: "https://api.asxs.top/v1",
+  sensenova: "https://token.sensenova.cn/v1",
   gemini: "https://generativelanguage.googleapis.com",
   seedance: "https://ark.cn-beijing.volces.com",
   "ucloud-seedance": "https://api.modelverse.cn",
   kling: "https://api.klingai.com",
   wan: "https://dashscope.aliyuncs.com/api/v1",
   dashscope: "https://dashscope.aliyuncs.com/api/v1",
+  comfyui: "https://47jy7y6u49-8188.cnb.run",
+  aivideo: "https://aivideomaker.ai",
+  nvidia: "https://integrate.api.nvidia.com/v1",
+  "nvidia-nim": "https://ai.api.nvidia.com",
+  hidream: "http://localhost:7860",
+  siliconflow: "https://api.siliconflow.cn",
+  framepack: "http://localhost:7860",
+  omnigen: "http://localhost:7860",
+  agnes: "https://apihub.agnes-ai.com/v1",
 };
 
 function getProtocolOptions(capability: Capability): { value: Protocol; label: string }[] {
@@ -28,14 +39,24 @@ function getProtocolOptions(capability: Capability): { value: Protocol; label: s
     return [
       { value: "openai", label: "OpenAI" },
       { value: "gemini", label: "Gemini" },
+      { value: "nvidia", label: "NVIDIA" },
+      { value: "agnes", label: "Agnes AI" },
     ];
   }
   if (capability === "image") {
     return [
       { value: "openai", label: "OpenAI" },
+      { value: "asxs", label: "ASXS" },
+      { value: "sensenova", label: "SenseNova" },
       { value: "gemini", label: "Gemini" },
       { value: "kling", label: "Kling" },
       { value: "dashscope", label: "百炼 (图片)" },
+      { value: "siliconflow", label: "SiliconFlow" },
+      { value: "comfyui", label: "ComfyUI" },
+      { value: "hidream", label: "HiDream (本地)" },
+      { value: "omnigen", label: "OmniGen (本地)" },
+      { value: "agnes", label: "Agnes AI" },
+      { value: "nvidia-nim", label: "NVIDIA NIM (Cosmos)" },
     ];
   }
   // video
@@ -45,7 +66,11 @@ function getProtocolOptions(capability: Capability): { value: Protocol; label: s
     { value: "gemini", label: "Gemini (Veo)" },
     { value: "kling", label: "Kling" },
     { value: "wan", label: "百炼 (视频)" },
-  ];
+    { value: "comfyui", label: "ComfyUI" },
+      { value: "aivideo", label: "AI Video" },
+      { value: "agnes", label: "Agnes AI" },
+      { value: "nvidia-nim", label: "NVIDIA NIM (Cosmos)" },
+    ];
 }
 
 interface ProviderFormProps {
@@ -74,6 +99,7 @@ export function ProviderForm({ provider }: ProviderFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           protocol: provider.protocol,
+          capability: provider.capability,
           baseUrl: provider.baseUrl,
           apiKey: provider.apiKey,
         }),

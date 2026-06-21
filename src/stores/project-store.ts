@@ -7,6 +7,8 @@ interface Character {
   description: string;
   referenceImage: string | null;
   referenceImageHistory?: string | null;
+  referenceImageSingle?: string | null;
+  referenceLayout?: "single" | "three-view" | "four-view" | null;
   visualHint?: string | null;
   scope?: string;
   episodeId?: string | null;
@@ -33,7 +35,11 @@ export type ShotAssetType =
   | "last_frame"
   | "reference"
   | "keyframe_video"
-  | "reference_video";
+  | "reference_video"
+  | "panel_1"
+  | "panel_2"
+  | "panel_3"
+  | "panel_4";
 
 export interface ShotAsset {
   id: string;
@@ -156,21 +162,29 @@ export function getSceneRefFrameUrl(shot: ShotLike): string | null {
   return getReferenceAssets(shot)[0]?.fileUrl ?? null;
 }
 
-/** First-frame prompt text (the LLM-generated description). */
+/** First-frame prompt text (the LLM-generated description). Falls back to panel_1 asset prompt for 4-grid mode. */
 export function getFirstFramePrompt(shot: ShotLike): string | null {
   return (
     activeAssets(shot).find(
       (a) => a.type === "first_frame" && a.sequenceInType === 0
-    )?.prompt ?? null
+    )?.prompt ??
+    activeAssets(shot).find(
+      (a) => a.type === "panel_1" && a.sequenceInType === 0
+    )?.prompt ??
+    null
   );
 }
 
-/** Last-frame prompt text. */
+/** Last-frame prompt text. Falls back to panel_4 asset prompt for 4-grid mode. */
 export function getLastFramePrompt(shot: ShotLike): string | null {
   return (
     activeAssets(shot).find(
       (a) => a.type === "last_frame" && a.sequenceInType === 0
-    )?.prompt ?? null
+    )?.prompt ??
+    activeAssets(shot).find(
+      (a) => a.type === "panel_4" && a.sequenceInType === 0
+    )?.prompt ??
+    null
   );
 }
 
@@ -183,6 +197,21 @@ export function hasAllReferenceImages(shot: ShotLike): boolean {
 /** Whether the shot has both first and last frame image URLs. */
 export function hasKeyframePair(shot: ShotLike): boolean {
   return !!getFirstFrameUrl(shot) && !!getLastFrameUrl(shot);
+}
+
+/** Get the active panel image URL for a 4-grid shot (panel index 1–4). */
+export function getPanelUrl(shot: ShotLike, panel: 1 | 2 | 3 | 4): string | null {
+  const type = `panel_${panel}` as ShotAssetType;
+  return (
+    activeAssets(shot).find(
+      (a) => a.type === type && a.sequenceInType === 0
+    )?.fileUrl ?? null
+  );
+}
+
+/** Whether all 4-grid panels have images. */
+export function hasAllPanels(shot: ShotLike): boolean {
+  return [1, 2, 3, 4].every((p) => !!getPanelUrl(shot, p as 1 | 2 | 3 | 4));
 }
 
 export type StoryboardVersion = {
@@ -200,7 +229,7 @@ interface Project {
   outline?: string;
   status: string;
   finalVideoUrl: string | null;
-  generationMode: "keyframe" | "reference";
+  generationMode: "keyframe" | "reference" | "4grid";
   characters: Character[];
   shots: Shot[];
   versions: StoryboardVersion[];
@@ -210,7 +239,9 @@ interface ProjectStore {
   project: Project | null;
   loading: boolean;
   currentEpisodeId: string | null;
-  fetchProject: (id: string, episodeId?: string, versionId?: string) => Promise<void>;
+  loadedProjectKey: string | null;
+  pendingProjectKey: string | null;
+  fetchProject: (id: string, episodeId?: string, versionId?: string, excludeShots?: boolean) => Promise<void>;
   updateIdea: (idea: string) => void;
   updateScript: (script: string) => void;
   setProject: (project: Project) => void;
@@ -220,22 +251,52 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   project: null,
   loading: false,
   currentEpisodeId: null,
+  loadedProjectKey: null,
+  pendingProjectKey: null,
 
-  fetchProject: async (id: string, episodeId?: string, versionId?: string) => {
+  fetchProject: async (id: string, episodeId?: string, versionId?: string, excludeShots?: boolean) => {
+    const requestKey = `${id}:${episodeId ?? ""}:${versionId ?? ""}:${excludeShots ? "light" : "full"}`;
+    const state = get();
+
+    if (state.pendingProjectKey === requestKey || state.loadedProjectKey === requestKey) {
+      return;
+    }
+
+    if (
+      excludeShots &&
+      state.project?.id === id &&
+      (episodeId ? state.currentEpisodeId === episodeId : true) &&
+      state.project.shots.length > 0
+    ) {
+      return;
+    }
+
     // Only show loading spinner on initial load (no project yet).
     // Version switches are background refreshes — don't unmount children.
-    if (!get().project) set({ loading: true });
+    if (!state.project) set({ loading: true, pendingProjectKey: requestKey });
+    else set({ pendingProjectKey: requestKey });
+
+    const params = new URLSearchParams();
+    if (versionId) params.set("versionId", versionId);
+    if (excludeShots) params.set("exclude", "shots");
+    const query = params.toString();
 
     let url: string;
     if (episodeId) {
-      url = `/api/projects/${id}/episodes/${episodeId}${versionId ? `?versionId=${versionId}` : ""}`;
+      url = `/api/projects/${id}/episodes/${episodeId}${query ? `?${query}` : ""}`;
     } else {
-      url = `/api/projects/${id}${versionId ? `?versionId=${versionId}` : ""}`;
+      url = `/api/projects/${id}${query ? `?${query}` : ""}`;
     }
 
     const res = await apiFetch(url);
     const data = await res.json();
-    set({ project: data, loading: false, currentEpisodeId: episodeId ?? null });
+    set({
+      project: data,
+      loading: false,
+      currentEpisodeId: episodeId ?? null,
+      loadedProjectKey: requestKey,
+      pendingProjectKey: null,
+    });
   },
 
   updateIdea: (idea: string) => {

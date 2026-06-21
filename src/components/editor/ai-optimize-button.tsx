@@ -114,8 +114,9 @@ export function AiOptimizeButton({
       } else {
         toast.error(t("common.generationFailed"));
       }
-    } catch {
-      toast.error(t("common.generationFailed"));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg.includes("余额") || msg.includes("quota") || msg.includes("insufficient") ? msg : t("common.generationFailed"));
     } finally {
       setOptimizing(false);
     }

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { id as genId } from "@/lib/id";
 
-export type Protocol = "openai" | "gemini" | "seedance" | "ucloud-seedance" | "kling" | "wan" | "dashscope";
+export type Protocol = "openai" | "asxs" | "gemini" | "seedance" | "ucloud-seedance" | "kling" | "wan" | "dashscope" | "comfyui" | "sensenova" | "siliconflow" | "aivideo" | "nvidia" | "nvidia-nim" | "hidream" | "framepack" | "omnigen" | "agnes";
 export type Capability = "text" | "image" | "video";
 
 export interface Model {
@@ -20,6 +20,7 @@ export interface Provider {
   apiKey: string;
   secretKey?: string;
   models: Model[];
+  templateKey?: string;
 }
 
 export interface ModelRef {
@@ -33,6 +34,23 @@ export interface ModelConfig {
   video: { protocol: Protocol; baseUrl: string; apiKey: string; secretKey?: string; modelId: string } | null;
 }
 
+function migrateLegacySenseNovaProvider(input: Record<string, unknown>) {
+  const protocol = input.protocol;
+  const baseUrl = typeof input.baseUrl === "string" ? input.baseUrl.toLowerCase() : "";
+  const models = Array.isArray(input.models) ? input.models : [];
+  const hasSenseNovaU1 = models.some((m) => {
+    if (!m || typeof m !== "object") return false;
+    const id = (m as Record<string, unknown>).id;
+    return typeof id === "string" && id.toLowerCase().includes("sensenova-u1-fast");
+  });
+
+  if (protocol === "openai" && baseUrl.includes("token.sensenova.cn") && hasSenseNovaU1) {
+    return { ...input, protocol: "sensenova", capability: "image" };
+  }
+
+  return input;
+}
+
 interface ModelStore {
   providers: Provider[];
   defaultTextModel: ModelRef | null;
@@ -40,6 +58,7 @@ interface ModelStore {
   defaultVideoModel: ModelRef | null;
 
   addProvider: (provider: Omit<Provider, "id" | "models">) => string;
+  addProviderTemplate: (provider: Omit<Provider, "id" | "models"> & { models?: Model[] }) => string;
   updateProvider: (id: string, updates: Partial<Omit<Provider, "id">>) => void;
   removeProvider: (id: string) => void;
   setModels: (providerId: string, models: Model[]) => void;
@@ -64,6 +83,31 @@ export const useModelStore = create<ModelStore>()(
         const id = genId();
         set((state) => ({
           providers: [...state.providers, { ...provider, id, models: [] }],
+        }));
+        return id;
+      },
+
+      addProviderTemplate: (provider) => {
+        const id = genId();
+        const models = provider.models ?? [];
+        const firstCheckedModel = models.find((m) => m.checked) ?? models[0] ?? null;
+        set((state) => ({
+          providers: [
+            ...state.providers,
+            { ...provider, id, models },
+          ],
+          defaultTextModel:
+            provider.capability === "text" && firstCheckedModel
+              ? { providerId: id, modelId: firstCheckedModel.id }
+              : state.defaultTextModel,
+          defaultImageModel:
+            provider.capability === "image" && firstCheckedModel
+              ? { providerId: id, modelId: firstCheckedModel.id }
+              : state.defaultImageModel,
+          defaultVideoModel:
+            provider.capability === "video" && firstCheckedModel
+              ? { providerId: id, modelId: firstCheckedModel.id }
+              : state.defaultVideoModel,
         }));
         return id;
       },
@@ -143,10 +187,13 @@ export const useModelStore = create<ModelStore>()(
 
       getModelConfig: () => {
         const state = get();
-        function resolve(ref: ModelRef | null) {
+        function resolve(ref: ModelRef | null, expectedCapability?: Capability) {
           if (!ref) return null;
           const provider = state.providers.find((p) => p.id === ref.providerId);
           if (!provider) return null;
+          if (expectedCapability && provider.capability !== expectedCapability) return null;
+          const modelExists = provider.models.some((m) => m.id === ref.modelId && m.checked);
+          if (!modelExists) return null;
           return {
             protocol: provider.protocol,
             baseUrl: provider.baseUrl,
@@ -156,9 +203,9 @@ export const useModelStore = create<ModelStore>()(
           };
         }
         return {
-          text: resolve(state.defaultTextModel),
-          image: resolve(state.defaultImageModel),
-          video: resolve(state.defaultVideoModel),
+          text: resolve(state.defaultTextModel, "text"),
+          image: resolve(state.defaultImageModel, "image"),
+          video: resolve(state.defaultVideoModel, "video"),
         };
       },
     }),
@@ -175,7 +222,7 @@ export const useModelStore = create<ModelStore>()(
             ...state,
             providers: providers.map((p) => {
               const caps = (p.capabilities as string[]) ?? [];
-              return { ...p, capability: caps[0] ?? "text" };
+              return migrateLegacySenseNovaProvider({ ...p, capability: caps[0] ?? "text" });
             }),
           };
         }
@@ -186,9 +233,11 @@ export const useModelStore = create<ModelStore>()(
         const ps = persistedState as Record<string, unknown>;
         const providers = (ps?.providers as Array<Record<string, unknown>>) ?? [];
         const migrated = providers.map((p) => {
-          if (typeof p.capability === "string") return p; // already migrated
+          if (typeof p.capability === "string") {
+            return migrateLegacySenseNovaProvider(p);
+          }
           const caps = (p.capabilities as string[]) ?? [];
-          return { ...p, capability: caps[0] ?? "text" };
+          return migrateLegacySenseNovaProvider({ ...p, capability: caps[0] ?? "text" });
         });
         return { ...currentState, ...ps, providers: migrated as unknown as Provider[] };
       },

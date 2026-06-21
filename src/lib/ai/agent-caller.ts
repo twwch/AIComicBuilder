@@ -48,6 +48,7 @@ async function callBailianAgentStream(
       input: { prompt },
       parameters: { incremental_output: true },
     }),
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!res.ok) {
@@ -118,6 +119,7 @@ async function callDifyAgentStream(
       response_mode: "streaming",
       user: "aicomic-user",
     }),
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!res.ok) {
@@ -206,6 +208,7 @@ export async function callBailianAgent(
       input: { prompt },
       parameters: {},
     }),
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!res.ok) {
@@ -274,6 +277,7 @@ async function callDifyAgent(
       response_mode: "blocking",
       user: "aicomic-user",
     }),
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!res.ok) {
@@ -334,6 +338,7 @@ async function callCozeAgent(
       workflow_id: config.appId,
       parameters: { input: prompt },
     }),
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!res.ok) {

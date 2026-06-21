@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { projects, episodes } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getUserIdFromRequest } from "@/lib/get-user-id";
+import { ReorderEpisodesSchema, parseOrThrow } from "@/lib/validation";
 
 async function resolveProject(id: string, userId: string) {
   const [project] = await db
@@ -24,15 +25,8 @@ export async function PUT(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const body = (await request.json()) as { orderedIds: string[] };
-  const { orderedIds } = body;
-
-  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
-    return NextResponse.json(
-      { error: "orderedIds must be a non-empty array" },
-      { status: 400 }
-    );
-  }
+  const raw = await request.json();
+  const { orderedIds } = parseOrThrow(ReorderEpisodesSchema, raw);
 
   // Update sequence numbers based on array order
   await Promise.all(

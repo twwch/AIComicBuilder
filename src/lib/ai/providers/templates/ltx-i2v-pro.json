@@ -1,0 +1,391 @@
+{
+  "75": {
+    "inputs": {
+      "filename_prefix": "{{filenamePrefix}}",
+      "format": "auto",
+      "codec": "auto",
+      "video-preview": "",
+      "video": ["320:310", 0]
+    },
+    "class_type": "SaveVideo",
+    "_meta": { "title": "保存视频" }
+  },
+  "269": {
+    "inputs": { "image": "{{startImage}}" },
+    "class_type": "LoadImage",
+    "_meta": { "title": "加载图像" }
+  },
+  "320:276": {
+    "inputs": { "noise_seed": 42 },
+    "class_type": "RandomNoise",
+    "_meta": { "title": "随机噪波" }
+  },
+  "320:277": {
+    "inputs": { "noise_seed": 823866535936365 },
+    "class_type": "RandomNoise",
+    "_meta": { "title": "随机噪波" }
+  },
+  "320:278": {
+    "inputs": {
+      "video_latent": ["320:288", 0],
+      "audio_latent": ["320:307", 1]
+    },
+    "class_type": "LTXVConcatAVLatent",
+    "_meta": { "title": "LTXVConcatAVLatent" }
+  },
+  "320:279": {
+    "inputs": { "ckpt_name": "LTX2.3\\ltx-2.3-22b-dev-fp8.safetensors" },
+    "class_type": "LTXVAudioVAELoader",
+    "_meta": { "title": "LTXV音频VAE加载器" }
+  },
+  "320:280": {
+    "inputs": { "sampler_name": "euler_cfg_pp" },
+    "class_type": "KSamplerSelect",
+    "_meta": { "title": "K采样器选择" }
+  },
+  "320:281": {
+    "inputs": { "sigmas": "0.85, 0.7250, 0.4219, 0.0" },
+    "class_type": "ManualSigmas",
+    "_meta": { "title": "自定义Sigmas" }
+  },
+  "320:282": {
+    "inputs": {
+      "cfg": 1,
+      "model": ["320:329", 0],
+      "positive": ["320:284", 0],
+      "negative": ["320:284", 1]
+    },
+    "class_type": "CFGGuider",
+    "_meta": { "title": "CFG引导器" }
+  },
+  "320:283": {
+    "inputs": {
+      "noise": ["320:277", 0],
+      "guider": ["320:314", 0],
+      "sampler": ["320:291", 0],
+      "sigmas": ["320:306", 0],
+      "latent_image": ["320:318", 0]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": { "title": "自定义采样器（高级）" }
+  },
+  "320:284": {
+    "inputs": {
+      "positive": ["320:304", 0],
+      "negative": ["320:304", 1],
+      "latent": ["320:307", 0]
+    },
+    "class_type": "LTXVCropGuides",
+    "_meta": { "title": "LTXV裁剪指导" }
+  },
+  "320:285": {
+    "inputs": {
+      "lora_name": "ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
+      "strength_model": 0.5,
+      "model": ["320:325", 0]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": { "title": "LoRA加载器（仅模型）" }
+  },
+  "320:329": {
+    "inputs": {
+      "nag_scale": 5,
+      "nag_alpha": 0.5,
+      "nag_tau": 1.5,
+      "model": ["320:285", 0]
+    },
+    "class_type": "NAGuidance",
+    "_meta": { "title": "归一化注意力引导" }
+  },
+  "320:286": {
+    "inputs": {
+      "longer_edge": 1536,
+      "images": ["320:290", 0]
+    },
+    "class_type": "ResizeImagesByLongerEdge",
+    "_meta": { "title": "缩放图像（长边）" }
+  },
+  "320:287": {
+    "inputs": {
+      "samples": ["320:307", 0],
+      "upscale_model": ["320:311", 0],
+      "vae": ["320:316", 2]
+    },
+    "class_type": "LTXVLatentUpsampler",
+    "_meta": { "title": "LTXV潜空间上采样器" }
+  },
+  "320:288": {
+    "inputs": {
+      "strength": 1,
+      "bypass": false,
+      "vae": ["320:316", 2],
+      "image": ["320:289", 0],
+      "latent": ["320:287", 0]
+    },
+    "class_type": "LTXVImgToVideoInplace",
+    "_meta": { "title": "LTXV图像转视频（原地）" }
+  },
+  "320:289": {
+    "inputs": {
+      "img_compression": 18,
+      "image": ["320:286", 0]
+    },
+    "class_type": "LTXVPreprocess",
+    "_meta": { "title": "LTXV预处理" }
+  },
+  "320:290": {
+    "inputs": {
+      "resize_type": "scale dimensions",
+      "resize_type.width": ["320:312", 0],
+      "resize_type.height": ["320:299", 0],
+      "resize_type.crop": "center",
+      "scale_method": "lanczos",
+      "input": ["269", 0]
+    },
+    "class_type": "ResizeImageMaskNode",
+    "_meta": { "title": "调整图像/掩码大小" }
+  },
+  "320:291": {
+    "inputs": { "sampler_name": "euler_ancestral_cfg_pp" },
+    "class_type": "KSamplerSelect",
+    "_meta": { "title": "K采样器选择" }
+  },
+  "320:292": {
+    "inputs": {
+      "expression": "a/2",
+      "values.a": ["320:312", 0]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": { "title": "数学表达式" }
+  },
+  "320:294": {
+    "inputs": {
+      "expression": "a/2",
+      "values.a": ["320:299", 0]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": { "title": "数学表达式" }
+  },
+  "320:295": {
+    "inputs": {
+      "width": ["320:292", 1],
+      "height": ["320:294", 1],
+      "length": ["320:323", 1],
+      "batch_size": 1
+    },
+    "class_type": "EmptyLTXVLatentVideo",
+    "_meta": { "title": "空Latent视频（LTXV）" }
+  },
+  "320:296": {
+    "inputs": {
+      "strength": 0.7,
+      "bypass": false,
+      "vae": ["320:316", 2],
+      "image": ["320:289", 0],
+      "latent": ["320:295", 0]
+    },
+    "class_type": "LTXVImgToVideoInplace",
+    "_meta": { "title": "LTXV图像转视频（原地）" }
+  },
+  "320:297": {
+    "inputs": {
+      "samples": ["320:309", 1],
+      "audio_vae": ["320:279", 0]
+    },
+    "class_type": "LTXVAudioVAEDecode",
+    "_meta": { "title": "LTXV音频VAE解码" }
+  },
+  "320:298": {
+    "inputs": {
+      "expression": "a",
+      "values.a": ["320:300", 0]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": { "title": "数学表达式" }
+  },
+  "320:299": {
+    "inputs": { "value": 1280 },
+    "class_type": "PrimitiveInt",
+    "_meta": { "title": "Height" }
+  },
+  "320:300": {
+    "inputs": { "value": 24 },
+    "class_type": "PrimitiveInt",
+    "_meta": { "title": "Frame Rate" }
+  },
+  "320:301": {
+    "inputs": { "value": 6 },
+    "class_type": "PrimitiveInt",
+    "_meta": { "title": "Duration" }
+  },
+  "320:302": {
+    "inputs": { "value": false },
+    "class_type": "PrimitiveBoolean",
+    "_meta": { "title": "Switch to Text to Video?" }
+  },
+  "320:303": {
+    "inputs": {
+      "text": ["320:319", 0],
+      "clip": ["320:317", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP文本编码" }
+  },
+  "320:304": {
+    "inputs": {
+      "frame_rate": ["320:298", 0],
+      "positive": ["320:303", 0],
+      "negative": ["320:313", 0]
+    },
+    "class_type": "LTXVConditioning",
+    "_meta": { "title": "LTXV条件" }
+  },
+  "320:305": {
+    "inputs": {
+      "frames_number": ["320:323", 1],
+      "frame_rate": ["320:298", 1],
+      "batch_size": 1,
+      "audio_vae": ["320:279", 0]
+    },
+    "class_type": "LTXVEmptyLatentAudio",
+    "_meta": { "title": "LTXV 空音频潜空间" }
+  },
+  "320:306": {
+    "inputs": { "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0" },
+    "class_type": "ManualSigmas",
+    "_meta": { "title": "自定义Sigmas" }
+  },
+  "320:307": {
+    "inputs": { "av_latent": ["320:283", 0] },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": { "title": "LTXV分离音视频潜空间" }
+  },
+  "320:308": {
+    "inputs": {
+      "noise": ["320:276", 0],
+      "guider": ["320:282", 0],
+      "sampler": ["320:280", 0],
+      "sigmas": ["320:281", 0],
+      "latent_image": ["320:278", 0]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": { "title": "自定义采样器（高级）" }
+  },
+  "320:309": {
+    "inputs": { "av_latent": ["320:308", 0] },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": { "title": "LTXV分离音视频潜空间" }
+  },
+  "320:310": {
+    "inputs": {
+      "fps": ["320:298", 0],
+      "images": ["320:315", 0],
+      "audio": ["320:297", 0]
+    },
+    "class_type": "CreateVideo",
+    "_meta": { "title": "创建视频" }
+  },
+  "320:311": {
+    "inputs": { "model_name": "ltx-2.3-spatial-upscaler-x2-1.0.safetensors" },
+    "class_type": "LatentUpscaleModelLoader",
+    "_meta": { "title": "加载Latent放大模型" }
+  },
+  "320:312": {
+    "inputs": { "value": 720 },
+    "class_type": "PrimitiveInt",
+    "_meta": { "title": "Width" }
+  },
+  "320:313": {
+    "inputs": {
+      "text": "pc game, console game, video game, cartoon, childish, ugly, nsfw, text, subtitles, captions, burned-in text, overlay text, watermark, logo, signature, numbers, letters, blurry text, garbage characters, unreadable symbols",
+      "clip": ["320:317", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP文本编码" }
+  },
+  "320:314": {
+    "inputs": {
+      "cfg": 1,
+      "model": ["320:329", 0],
+      "positive": ["320:304", 0],
+      "negative": ["320:304", 1]
+    },
+    "class_type": "CFGGuider",
+    "_meta": { "title": "CFG引导器" }
+  },
+  "320:315": {
+    "inputs": {
+      "tile_size": 768,
+      "overlap": 64,
+      "temporal_size": 4096,
+      "temporal_overlap": 4,
+      "samples": ["320:309", 0],
+      "vae": ["320:316", 2]
+    },
+    "class_type": "VAEDecodeTiled",
+    "_meta": { "title": "VAE解码（分块）" }
+  },
+  "320:316": {
+    "inputs": { "ckpt_name": "LTX2.3\\ltx-2.3-22b-dev-fp8.safetensors" },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "Checkpoint加载器（简易）" }
+  },
+  "320:317": {
+    "inputs": {
+      "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ckpt_name": "LTX2.3\\ltx-2.3-22b-dev-fp8.safetensors",
+      "device": "default"
+    },
+    "class_type": "LTXAVTextEncoderLoader",
+    "_meta": { "title": "LTXV音频文本编码器加载器" }
+  },
+  "320:318": {
+    "inputs": {
+      "video_latent": ["320:296", 0],
+      "audio_latent": ["320:305", 0]
+    },
+    "class_type": "LTXVConcatAVLatent",
+    "_meta": { "title": "LTXVConcatAVLatent" }
+  },
+  "320:319": {
+    "inputs": { "value": "a girl drinking bubble tea" },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": { "title": "Prompt" }
+  },
+  "320:323": {
+    "inputs": {
+      "expression": "a * b + 1",
+      "values.a": ["320:301", 0],
+      "values.b": ["320:300", 0]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": { "title": "Math Expression (length)" }
+  },
+  "320:326": {
+    "inputs": {
+      "lora_name": "Singularity-LTX-2.3_OmniCine_V1.safetensors",
+      "strength_model": 1.0,
+      "model": ["320:316", 0]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": { "title": "LoRA加载器（仅模型）" }
+  },
+  "320:324": {
+    "inputs": {
+      "lora_name": "ltx2.3-ic-subtitles-remove-general.safetensors",
+      "strength_model": 1.0,
+      "model": ["320:326", 0]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": { "title": "LoRA加载器（仅模型）" }
+  },
+  "320:325": {
+    "inputs": {
+      "lora_name": "ltx2.3-video-restoration-general.safetensors",
+      "strength_model": 1.0,
+      "model": ["320:324", 0]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": { "title": "LoRA加载器（仅模型）" }
+  }
+}

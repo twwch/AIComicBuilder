@@ -8,12 +8,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { useTranslations } from "next-intl";
 import { uploadUrl } from "@/lib/utils/upload-url";
 import { useModelStore, type ModelRef } from "@/stores/model-store";
-import { Sparkles, Loader2, Copy, Check, ArrowUpCircle, Trash2, ChevronLeft, ChevronRight, Upload } from "lucide-react";
+import { Sparkles, Loader2, Copy, Check, ArrowUpCircle, Trash2, ChevronLeft, ChevronRight, Upload, ChevronDown } from "lucide-react";
 import { InlineModelPicker } from "@/components/editor/model-selector";
 import { apiFetch } from "@/lib/api-fetch";
 import { useModelGuard } from "@/hooks/use-model-guard";
 import { toast } from "sonner";
 import { buildCharacterTurnaroundPrompt } from "@/lib/ai/prompts/character-image";
+
+type ReferenceLayout = "single" | "three-view" | "four-view";
+
+const LAYOUT_OPTIONS: Array<{ value: ReferenceLayout; label: string; hint: string }> = [
+  { value: "single", label: "单图", hint: "单角色全身立绘" },
+  { value: "three-view", label: "三视图", hint: "正面/侧面/背面" },
+  { value: "four-view", label: "四视图", hint: "正面/3-4/侧面/背面" },
+];
 
 interface CharacterCardProps {
   id: string;
@@ -59,13 +67,35 @@ export function CharacterCard({
   useEffect(() => { setEditName(name); }, [name]);
   useEffect(() => { setEditDesc(description); }, [description]);
   useEffect(() => { setEditVisualHint(visualHint ?? ""); }, [visualHint]);
+  useEffect(() => { setLocalImage(null); }, [referenceImage]);
   const [generating, setGenerating] = useState(false);
   const [lightbox, setLightbox] = useState(false);
   const [copied, setCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [layoutMenu, setLayoutMenu] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const layoutButtonRef = useRef<HTMLDivElement>(null);
   const imageGuard = useModelGuard("image");
   const isGenerating = generating || (!!batchGenerating && !referenceImage);
+  const [generationKey, setGenerationKey] = useState(0);
+  const [localImage, setLocalImage] = useState<string | null>(null);
+  const displayImage = localImage ?? referenceImage;
+
+  useEffect(() => {
+    if (!layoutMenu) return;
+    function onDocClick(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest("[data-layout-menu]")) return;
+      setLayoutMenu(false);
+    }
+    function onScroll() { setLayoutMenu(false); }
+    document.addEventListener("mousedown", onDocClick);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [layoutMenu]);
 
   function resolveImageRef(ref: ModelRef | null) {
     if (!ref) return null;
@@ -89,25 +119,28 @@ export function CharacterCard({
     onUpdate();
   }
 
-  async function handleGenerateImage() {
+  async function handleGenerateImage(layout: ReferenceLayout = "four-view") {
     if (!imageGuard()) return;
     setGenerating(true);
+    setLayoutMenu(false);
     try {
       const response = await apiFetch(`/api/projects/${projectId}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "single_character_image",
-          payload: { characterId: id },
+          payload: { characterId: id, referenceLayout: layout },
           modelConfig: { ...getModelConfig(), image: resolveImageRef(imageModelRef) },
         }),
       });
       await response.json();
     } catch (err) {
-      console.error("Character image error:", err);
-      toast.error(t("common.generationFailed"));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Character image error:", msg);
+      toast.error(msg.includes("余额") || msg.includes("quota") || msg.includes("insufficient") ? msg : t("common.generationFailed"));
     }
     setGenerating(false);
+    setGenerationKey((k) => k + 1);
     onUpdate();
   }
 
@@ -144,24 +177,27 @@ export function CharacterCard({
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         )}
-        {referenceImage ? (() => {
+        {referenceImage || localImage ? (() => {
           let history: string[] = [];
           try { history = JSON.parse(referenceImageHistory || "[]"); } catch {}
           if (history.length === 0 && referenceImage) history = [referenceImage];
-          const currentIdx = history.indexOf(referenceImage);
+          const currentIdx = history.indexOf(displayImage ?? "");
           const showArrows = history.length > 1;
           async function switchTo(newPath: string) {
+            setLocalImage(newPath);
+            setGenerationKey((k) => k + 1);
             await apiFetch(`/api/projects/${projectId}/characters/${id}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ referenceImage: newPath }),
             });
+            setGenerationKey((k) => k + 1);
             onUpdate();
           }
           return (
             <div className="relative w-full aspect-video overflow-hidden rounded-xl cursor-pointer group" onClick={() => setLightbox(true)}>
               <img
-                src={uploadUrl(referenceImage)}
+                src={`${uploadUrl(displayImage ?? "")}?t=${generationKey}`}
                 alt={name}
                 className="w-full h-full object-cover"
               />
@@ -257,19 +293,45 @@ export function CharacterCard({
         <div className="space-y-2">
             <InlineModelPicker capability="image" value={imageModelRef} onChange={setImageModelRef} />
             <div className="flex gap-2">
-              <Button
-                onClick={handleGenerateImage}
-                disabled={isGenerating}
-                className="flex-1"
-                size="sm"
-              >
-                {isGenerating ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                {isGenerating ? t("common.generating") : t("character.generateImage")}
-              </Button>
+              <div ref={layoutButtonRef} className="flex-1" data-layout-menu>
+                <Button
+                  onClick={() => setLayoutMenu((v) => !v)}
+                  disabled={isGenerating}
+                  className="w-full"
+                  size="sm"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {isGenerating ? t("common.generating") : t("character.generateImage")}
+                  <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                </Button>
+                {layoutMenu && layoutButtonRef.current && (() => {
+                  const r = layoutButtonRef.current.getBoundingClientRect();
+                  const spaceBelow = window.innerHeight - r.bottom;
+                  const openUp = spaceBelow < 160;
+                  return (
+                    <div
+                      className="fixed z-50 rounded-md border border-[--border-subtle] bg-white p-1 shadow-lg"
+                      style={{ left: r.left, width: r.width, top: openUp ? undefined : r.bottom + 4, bottom: openUp ? window.innerHeight - r.top + 4 : undefined }}
+                      data-layout-menu
+                    >
+                      {LAYOUT_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => handleGenerateImage(opt.value)}
+                          className="flex w-full flex-col items-start rounded px-2 py-1.5 text-left text-[11px] text-[--text-secondary] transition-colors hover:bg-primary/10 hover:text-primary"
+                        >
+                          <span className="font-medium">{opt.label}</span>
+                          <span className="text-[10px] text-[--text-muted]">{opt.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -312,7 +374,7 @@ export function CharacterCard({
             <DialogTitle className="sr-only">{name}</DialogTitle>
             <div className="relative inline-block w-full">
               <img
-                src={uploadUrl(referenceImage)}
+                src={`${uploadUrl(displayImage ?? "")}?t=${generationKey}`}
                 alt={name}
                 className="w-full max-h-[85vh] object-contain rounded-xl"
               />

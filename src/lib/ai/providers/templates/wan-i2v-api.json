@@ -1,0 +1,285 @@
+{
+  "22": {
+    "inputs": {
+      "model": "gguf/wan2.2_i2v_high_noise_14B_Q4_K_S.gguf",
+      "base_precision": "fp16_fast",
+      "quantization": "disabled",
+      "load_device": "offload_device",
+      "attention_mode": "sageattn",
+      "rms_norm_function": "default",
+      "compile_args": ["35", 0]
+    },
+    "class_type": "WanVideoModelLoader"
+  },
+  "27": {
+    "inputs": {
+      "steps": ["94", 0],
+      "cfg": ["95", 0],
+      "shift": 8,
+      "seed": "{{seed_high}}",
+      "force_offload": true,
+      "scheduler": "dpm++_sde",
+      "riflex_freq_index": 0,
+      "denoise_strength": 1,
+      "batched_cfg": false,
+      "rope_function": "comfy",
+      "start_step": 0,
+      "end_step": ["91", 0],
+      "add_noise_to_samples": false,
+      "model": ["80", 0],
+      "image_embeds": ["89", 0],
+      "text_embeds": ["103", 0]
+    },
+    "class_type": "WanVideoSampler"
+  },
+  "28": {
+    "inputs": {
+      "enable_vae_tiling": false,
+      "tile_x": 272,
+      "tile_y": 272,
+      "tile_stride_x": 144,
+      "tile_stride_y": 128,
+      "normalization": "default",
+      "vae": ["38", 0],
+      "samples": ["90", 0]
+    },
+    "class_type": "WanVideoDecode"
+  },
+  "35": {
+    "inputs": {
+      "backend": "inductor",
+      "fullgraph": false,
+      "mode": "default",
+      "dynamic": false,
+      "dynamo_cache_size_limit": 64,
+      "compile_transformer_blocks_only": true,
+      "dynamo_recompile_limit": 128,
+      "force_parameter_static_shapes": false,
+      "allow_unmerged_lora_compile": false
+    },
+    "class_type": "WanVideoTorchCompileSettings"
+  },
+  "38": {
+    "inputs": {
+      "model_name": "wan/wan_2.1_vae.safetensors",
+      "precision": "bf16",
+      "use_cpu_cache": false,
+      "verbose": false
+    },
+    "class_type": "WanVideoVAELoader"
+  },
+  "39": {
+    "inputs": {
+      "blocks_to_swap": 40,
+      "offload_img_emb": false,
+      "offload_txt_emb": false,
+      "use_non_blocking": false,
+      "vace_blocks_to_swap": 1,
+      "prefetch_blocks": 0,
+      "block_swap_debug": false
+    },
+    "class_type": "WanVideoBlockSwap"
+  },
+  "56": {
+    "inputs": {
+      "lora": "Comfy/Lora/lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+      "strength": 3,
+      "low_mem_load": false,
+      "merge_loras": false
+    },
+    "class_type": "WanVideoLoraSelect"
+  },
+  "60": {
+    "inputs": {
+      "frame_rate": 24,
+      "loop_count": 0,
+      "filename_prefix": "{{filenamePrefix}}",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "images": ["69", 0]
+    },
+    "class_type": "VHS_VideoCombine"
+  },
+  "67": {
+    "inputs": {
+      "image": "{{startImage}}"
+    },
+    "class_type": "LoadImage"
+  },
+  "68": {
+    "inputs": {
+      "width": {{width}},
+      "height": {{height}},
+      "upscale_method": "lanczos",
+      "keep_proportion": "crop",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "cpu",
+      "image": ["67", 0]
+    },
+    "class_type": "ImageResizeKJv2"
+  },
+  "69": {
+    "inputs": {
+      "image": ["28", 0]
+    },
+    "class_type": "GetImageSizeAndCount"
+  },
+  "71": {
+    "inputs": {
+      "model": "gguf/wan2.2_i2v_low_noise_14B_Q4_K_S.gguf",
+      "base_precision": "fp16_fast",
+      "quantization": "disabled",
+      "load_device": "offload_device",
+      "attention_mode": "sageattn",
+      "rms_norm_function": "default",
+      "compile_args": ["35", 0]
+    },
+    "class_type": "WanVideoModelLoader"
+  },
+  "79": {
+    "inputs": {
+      "model": ["93", 0],
+      "lora": ["97", 0]
+    },
+    "class_type": "WanVideoSetLoRAs"
+  },
+  "80": {
+    "inputs": {
+      "model": ["92", 0],
+      "lora": ["56", 0]
+    },
+    "class_type": "WanVideoSetLoRAs"
+  },
+  "89": {
+    "inputs": {
+      "width": ["68", 1],
+      "height": ["68", 2],
+      "num_frames": {{numFrames}},
+      "noise_aug_strength": 0,
+      "start_latent_strength": 1,
+      "end_latent_strength": 1,
+      "force_offload": true,
+      "fun_or_fl2v_model": false,
+      "tiled_vae": false,
+      "augment_empty_frames": 0,
+      "vae": ["38", 0],
+      "start_image": ["68", 0]
+    },
+    "class_type": "WanVideoImageToVideoEncode"
+  },
+  "90": {
+    "inputs": {
+      "steps": ["94", 0],
+      "cfg": 1,
+      "shift": 8,
+      "seed": "{{seed_low}}",
+      "force_offload": true,
+      "scheduler": "dpm++_sde",
+      "riflex_freq_index": 0,
+      "denoise_strength": 1,
+      "batched_cfg": false,
+      "rope_function": "comfy",
+      "start_step": ["91", 0],
+      "end_step": -1,
+      "add_noise_to_samples": false,
+      "model": ["79", 0],
+      "image_embeds": ["89", 0],
+      "text_embeds": ["103", 0],
+      "samples": ["27", 0]
+    },
+    "class_type": "WanVideoSampler"
+  },
+  "91": {
+    "inputs": {
+      "value": 2
+    },
+    "class_type": "INTConstant"
+  },
+  "92": {
+    "inputs": {
+      "model": ["22", 0],
+      "block_swap_args": ["39", 0]
+    },
+    "class_type": "WanVideoSetBlockSwap"
+  },
+  "93": {
+    "inputs": {
+      "model": ["71", 0],
+      "block_swap_args": ["39", 0]
+    },
+    "class_type": "WanVideoSetBlockSwap"
+  },
+  "94": {
+    "inputs": {
+      "value": 4
+    },
+    "class_type": "INTConstant"
+  },
+  "95": {
+    "inputs": {
+      "steps": ["94", 0],
+      "cfg_scale_start": 2,
+      "cfg_scale_end": 2,
+      "interpolation": "linear",
+      "start_percent": 0,
+      "end_percent": 0.01
+    },
+    "class_type": "CreateCFGScheduleFloatList"
+  },
+  "97": {
+    "inputs": {
+      "lora": "Comfy/Lora/lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+      "strength": 1,
+      "low_mem_load": false,
+      "merge_loras": false
+    },
+    "class_type": "WanVideoLoraSelect"
+  },
+  "98": {
+    "inputs": {
+      "clip_name": "wan/umt5-xxl-encoder-Q4_K_S.gguf",
+      "type": "wan"
+    },
+    "class_type": "CLIPLoaderGGUF"
+  },
+  "99": {
+    "inputs": {
+      "text": "{{positivePrompt}}",
+      "clip": ["98", 0]
+    },
+    "class_type": "CLIPTextEncode"
+  },
+  "100": {
+    "inputs": {
+      "text": "{{negativePrompt}}",
+      "clip": ["98", 0]
+    },
+    "class_type": "CLIPTextEncode"
+  },
+  "101": {
+    "inputs": {
+      "anything": ["99", 0]
+    },
+    "class_type": "easy cleanGpuUsed"
+  },
+  "102": {
+    "inputs": {
+      "anything": ["100", 0]
+    },
+    "class_type": "easy cleanGpuUsed"
+  },
+  "103": {
+    "inputs": {
+      "positive": ["101", 0],
+      "negative": ["102", 0]
+    },
+    "class_type": "WanVideoTextEmbedBridge"
+  }
+}

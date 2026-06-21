@@ -16,7 +16,7 @@ import {
   getReferenceVideoUrl,
   getFirstFramePrompt,
   getLastFramePrompt,
-  getReferenceAssets,
+  getPanelUrl,
   type ShotAsset,
 } from "@/stores/project-store";
 import { useModelGuard } from "@/hooks/use-model-guard";
@@ -50,7 +50,7 @@ import { id as genId } from "@/lib/id";
 // Local shape compatible with legacy rendering code, built from ShotAsset.
 interface RefImage {
   id: string;
-  type: "first_frame" | "last_frame" | "reference" | "video" | "ref_video";
+  type: "first_frame" | "last_frame" | "reference" | "video" | "ref_video" | "panel_1" | "panel_2" | "panel_3" | "panel_4";
   prompt: string;
   imagePath?: string;
   status: "pending" | "generated";
@@ -69,6 +69,10 @@ function assetToRefImage(a: ShotAsset, allAssets: ShotAsset[] = []): RefImage {
     reference: "reference",
     keyframe_video: "video",
     reference_video: "ref_video",
+    panel_1: "panel_1",
+    panel_2: "panel_2",
+    panel_3: "panel_3",
+    panel_4: "panel_4",
   };
   // Build the version history from all sibling rows in the same slot,
   // sorted oldest → newest by assetVersion. Each entry has fileUrl + asset id
@@ -95,8 +99,9 @@ function assetToRefImage(a: ShotAsset, allAssets: ShotAsset[] = []): RefImage {
 interface ShotCardProps {
   shot: Shot;
   projectId: string;
+  episodeId?: string | null;
   onUpdate: () => void;
-  generationMode?: "keyframe" | "reference";
+  generationMode?: "keyframe" | "reference" | "4grid";
   videoRatio?: string;
   isCompact?: boolean;
   onOpenDrawer?: (id: string) => void;
@@ -173,6 +178,7 @@ function StepRow({
 export function ShotCard({
   shot,
   projectId,
+  episodeId,
   onUpdate,
   generationMode = "keyframe",
   videoRatio = "16:9",
@@ -202,6 +208,10 @@ export function ShotCard({
   const firstFrame = getFirstFrameUrl(shot);
   const lastFrame = getLastFrameUrl(shot);
   const sceneRefFrame = getSceneRefFrameUrl(shot);
+  const panel1 = getPanelUrl(shot, 1);
+  const panel2 = getPanelUrl(shot, 2);
+  const panel3 = getPanelUrl(shot, 3);
+  const panel4 = getPanelUrl(shot, 4);
   const videoUrl = generationMode === "reference" ? getReferenceVideoUrl(shot) : getKeyframeVideoUrl(shot);
   const startFrameDesc = getFirstFramePrompt(shot);
   const endFrameDesc = getLastFramePrompt(shot);
@@ -266,7 +276,9 @@ export function ShotCard({
 
   // Derived state
   const hasText = !!(prompt || startFrameDesc || motionScript);
-  const hasFrame = !!(sceneRefFrame || firstFrame || lastFrame);
+  const hasFrame = generationMode === "4grid"
+    ? !!(panel1 || panel2 || panel3 || panel4)
+    : !!(sceneRefFrame || firstFrame || lastFrame);
   const hasFramePair = !!(firstFrame && lastFrame);
   const hasVideoPrompt = !!videoPrompt;
   const hasVideo = !!videoUrl;
@@ -307,6 +319,7 @@ export function ShotCard({
           action: "single_frame_generate",
           payload: { shotId: id, ratio: videoRatio },
           modelConfig: getModelConfig(),
+          episodeId,
         }),
       });
       onUpdate();
@@ -314,26 +327,6 @@ export function ShotCard({
       toast.error(err instanceof Error ? err.message : t("common.generationFailed"));
     }
     setGeneratingFrames(false);
-  }
-
-  async function handleGenerateSceneFrame() {
-    if (!imageGuard()) return;
-    setGeneratingSceneFrame(true);
-    try {
-      await apiFetch(`/api/projects/${projectId}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "single_scene_frame",
-          payload: { shotId: id },
-          modelConfig: getModelConfig(),
-        }),
-      });
-      onUpdate();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("common.generationFailed"));
-    }
-    setGeneratingSceneFrame(false);
   }
 
   async function handleGenerateVideoPrompt() {
@@ -346,6 +339,7 @@ export function ShotCard({
           action: "single_video_prompt",
           payload: { shotId: id },
           modelConfig: getModelConfig(),
+          episodeId,
         }),
       });
       onUpdate();
@@ -366,6 +360,7 @@ export function ShotCard({
           action: generationMode === "reference" ? "single_reference_video" : "single_video_generate",
           payload: { shotId: id, ratio: videoRatio },
           modelConfig: getModelConfig(),
+          episodeId,
         }),
       });
       onUpdate();
@@ -385,6 +380,7 @@ export function ShotCard({
           action: "single_shot_rewrite",
           payload: { shotId: id },
           modelConfig: getModelConfig(),
+          episodeId,
         }),
       });
       onUpdate();
@@ -403,6 +399,10 @@ export function ShotCard({
       reference: "reference",
       video: "keyframe_video",
       ref_video: "reference_video",
+      panel_1: "panel_1",
+      panel_2: "panel_2",
+      panel_3: "panel_3",
+      panel_4: "panel_4",
     };
     const type = reverseTypeMap[r.type];
     if (!type) return null;
@@ -445,12 +445,22 @@ export function ShotCard({
     }
   }
 
-  async function handleClearFrame(field: "firstFrame" | "lastFrame" | "sceneRefFrame") {
-    const targetType: ShotAsset["type"] =
-      field === "firstFrame" ? "first_frame" : field === "lastFrame" ? "last_frame" : "reference";
-    // Remove the matching item from allRefItems
+  async function handleClearFrame(field: string) {
+    const FIELD_TO_TYPE: Record<string, ShotAsset["type"]> = {
+      firstFrame: "first_frame",
+      lastFrame: "last_frame",
+      sceneRefFrame: "reference",
+      panel1: "panel_1",
+      panel2: "panel_2",
+      panel3: "panel_3",
+      panel4: "panel_4",
+    };
+    const targetType = FIELD_TO_TYPE[field];
+    if (!targetType) return;
     const updated = allRefItems.filter(
-      (r) => !(r.type === targetType && (targetType !== "reference" || r.id === allRefItems.find((x) => x.type === "reference")?.id))
+      (r) => !(r.type === targetType && (field === "sceneRefFrame"
+        ? r.id === allRefItems.find((x) => x.type === "reference")?.id
+        : true))
     );
     await syncAssetsToBackend(updated);
   }
@@ -485,10 +495,10 @@ export function ShotCard({
   }
 
   /**
-   * Save the prompt text for first_frame or last_frame.
+   * Save the prompt text for first_frame, last_frame, or panel types.
    * If the asset row doesn't exist yet, create it via the sync endpoint.
    */
-  async function saveKeyframePrompt(slot: "first_frame" | "last_frame", prompt: string) {
+  async function saveKeyframePrompt(slot: RefImage["type"], prompt: string) {
     const existing = allRefItems.find((r) => r.type === slot);
     let updated: RefImage[];
     if (existing) {
@@ -655,12 +665,14 @@ export function ShotCard({
           action: "single_ref_image_generate",
           payload: { shotId: id, refImageId: refId, ratio: videoRatio },
           modelConfig,
+          episodeId,
         }),
       });
       if (!resp.ok) throw new Error("Failed");
       onUpdate();
-    } catch {
-      toast.error(t("common.generationFailed"));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg.includes("余额") || msg.includes("quota") || msg.includes("insufficient") ? msg : t("common.generationFailed"));
     } finally {
       setRegeneratingRefIds((prev) => {
         const next = new Set(prev);
@@ -681,18 +693,20 @@ export function ShotCard({
           action: "single_ref_image_generate_all",
           payload: { shotId: id, ratio: videoRatio },
           modelConfig: getModelConfig(),
+          episodeId,
         }),
       });
       if (!resp.ok) throw new Error("Failed");
       onUpdate();
       toast.success(t("common.generationCompleted"));
     } catch (err) {
-      toast.error(t("common.generationFailed"));
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg.includes("余额") || msg.includes("quota") || msg.includes("insufficient") ? msg : t("common.generationFailed"));
     }
     setGeneratingSceneFrame(false);
   }
 
-  function handleUploadFrame(field: "firstFrame" | "lastFrame" | "sceneRefFrame") {
+  function handleUploadFrame(field: string) {
     uploadFieldRef.current = field;
     uploadInputRef.current?.click();
   }
@@ -726,15 +740,19 @@ export function ShotCard({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const frameAssets = generationMode === "reference"
-    ? [{ src: sceneRefFrame, label: t("shot.sceneRefFrame"), type: "image" as const }]
+  const frameAssets = generationMode === "4grid"
+    ? [
+        { src: panel1, label: "PANEL 1", type: "image" as const, panelIdx: 0, field: "panel1" as const },
+        { src: panel2, label: "PANEL 2", type: "image" as const, panelIdx: 1, field: "panel2" as const },
+        { src: panel3, label: "PANEL 3", type: "image" as const, panelIdx: 2, field: "panel3" as const },
+        { src: panel4, label: "PANEL 4", type: "image" as const, panelIdx: 3, field: "panel4" as const },
+      ]
+    : generationMode === "reference"
+    ? [{ src: sceneRefFrame, label: t("shot.sceneRefFrame"), type: "image" as const, panelIdx: 0, field: "sceneRefFrame" as const }]
     : [
-        { src: firstFrame, label: t("shot.firstFrame"), type: "image" as const },
-        { src: lastFrame, label: t("shot.lastFrame"), type: "image" as const },
+        { src: firstFrame, label: t("shot.firstFrame"), type: "image" as const, panelIdx: 0, field: "firstFrame" as const },
+        { src: lastFrame, label: t("shot.lastFrame"), type: "image" as const, panelIdx: 1, field: "lastFrame" as const },
       ];
-
-  // Progress dots: how many steps done out of 4
-  const stepsDone = [hasText, hasFrame, hasVideoPrompt, hasVideo].filter(Boolean).length;
 
   if (isCompact) {
     return (
@@ -748,11 +766,15 @@ export function ShotCard({
         </div>
         {/* Thumbnails */}
         <div className="flex gap-1">
-          {(generationMode === "reference"
-            ? [sceneRefFrame, videoUrl]
-            : [firstFrame, lastFrame, videoUrl]
-          ).map((src, i) => {
-            const isVid = i === (generationMode === "reference" ? 1 : 2);
+          {(() => {
+            const thumbs = generationMode === "4grid"
+              ? [panel1, panel2, panel3, panel4]
+              : generationMode === "reference"
+                ? [sceneRefFrame, videoUrl]
+                : [firstFrame, lastFrame, videoUrl];
+            const vidIdx = generationMode === "reference" ? 1 : (generationMode === "4grid" ? -1 : 2);
+            return thumbs.map((src, i) => {
+              const isVid = i === vidIdx;
             return (
               <div key={i} className="h-8 w-11 flex-shrink-0 overflow-hidden rounded-md border border-[--border-subtle] bg-[--surface]">
                 {src ? (
@@ -769,7 +791,8 @@ export function ShotCard({
                 )}
               </div>
             );
-          })}
+            });
+          })()}
         </div>
         {/* Scene text */}
         <p className="flex-1 truncate text-xs text-[--text-secondary]">{prompt}</p>
@@ -798,11 +821,14 @@ export function ShotCard({
 
         {/* Media thumbnails */}
         <div className="flex gap-1.5">
-          {(generationMode === "reference"
-            ? [sceneRefFrame, videoUrl]
-            : [firstFrame, lastFrame, videoUrl]
+          {(generationMode === "4grid"
+            ? [panel1, panel2, panel3, panel4]
+            : generationMode === "reference"
+              ? [sceneRefFrame, videoUrl]
+              : [firstFrame, lastFrame, videoUrl]
           ).map((src, i) => {
-            const isVideo = i === (generationMode === "reference" ? 1 : 2);
+            const total = generationMode === "4grid" ? 4 : (generationMode === "reference" ? 2 : 3);
+            const isVideo = i === total - 1 && generationMode !== "4grid";
             return (
               <div
                 key={i}
@@ -940,6 +966,56 @@ export function ShotCard({
           state={textState}
           defaultOpen={false}
         >
+          {generationMode === "4grid" ? (
+            <div className="space-y-2.5">
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { key: "start", label: "PANEL 1（开场）", value: editStartFrame, setter: setEditStartFrame, dbField: "startFrameDesc", panelType: "panel_1" as const },
+                  { key: "prompt", label: "PANEL 2（发展）", value: editPrompt, setter: setEditPrompt, dbField: "prompt", panelType: null },
+                  { key: "motion", label: "PANEL 3（转折）", value: editMotionScript, setter: setEditMotionScript, dbField: "motionScript", panelType: null },
+                  { key: "end", label: "PANEL 4（收束）", value: editEndFrame, setter: setEditEndFrame, dbField: "endFrameDesc", panelType: "panel_4" as const },
+                ] as const).map((panel) => {
+                  const save = (v: string) => {
+                    panel.setter(v);
+                    if (panel.panelType) {
+                      saveKeyframePrompt(panel.panelType, v);
+                    } else {
+                      patchShot({ [panel.dbField]: v });
+                    }
+                  };
+                  return (
+                  <div key={panel.key}>
+                    <div className="mb-1 flex items-center gap-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-600">{panel.label}</p>
+                      <AiOptimizeButton
+                        value={panel.value}
+                        onOptimized={(v) => save(v)}
+                        fieldLabel={panel.dbField}
+                        projectId={projectId}
+                      />
+                    </div>
+                    <Textarea
+                      value={panel.value}
+                      onChange={(e) => panel.setter(e.target.value)}
+                      onBlur={() => save(panel.value)}
+                      rows={2}
+                    />
+                  </div>
+                  );
+                })}
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[--text-muted]">{t("shot.cameraDirection")}</p>
+                <input
+                  value={editCameraDirection}
+                  onChange={(e) => setEditCameraDirection(e.target.value)}
+                  onBlur={() => patchShot({ cameraDirection: editCameraDirection })}
+                  className="w-full rounded-xl border border-[--border-subtle] bg-white px-3 py-2 text-sm outline-none focus:border-primary/50"
+                  placeholder="static / pan-left / zoom-in ..."
+                />
+              </div>
+            </div>
+          ) : (
           <div className="space-y-2.5">
             <div>
               <div className="mb-1 flex items-center gap-1">
@@ -999,11 +1075,12 @@ export function ShotCard({
               {rewritingText ? t("common.generating") : t("shot.rewriteText")}
             </Button>
           </div>
+          )}
         </StepRow>
 
         {/* Step 2: 帧 */}
         <StepRow
-          label={generationMode === "reference" ? t("shot.stepSceneFrame") : t("shot.stepFrames")}
+          label={generationMode === "reference" ? t("shot.stepSceneFrame") : generationMode === "4grid" ? "四宫格分镜帧" : t("shot.stepFrames")}
           state={frameState}
           isNext={nextStep === "frame"}
         >
@@ -1169,6 +1246,56 @@ export function ShotCard({
                 </button>
               )}
             </div>
+          ) : generationMode === "4grid" ? (
+            <div className="mb-2.5 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                {frameAssets.map((asset, i) => {
+                  const panelLabels = ["PANEL 1（开场）", "PANEL 2（发展）", "PANEL 3（转折）", "PANEL 4（收束）"];
+                  const fieldName = asset.field;
+                  const isUploading = uploadingField === fieldName;
+                  return (
+                    <div key={i} className="rounded-lg border border-[--border-subtle] bg-white overflow-hidden">
+                      <div
+                        className={`relative bg-[--surface] ${asset.src ? "aspect-video" : "h-16"} ${asset.src && !isUploading ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}`}
+                        onClick={() => asset.src && !isUploading && setPreviewSrc(uploadUrl(asset.src))}
+                      >
+                        {isUploading ? (
+                          <div className="flex h-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div>
+                        ) : asset.src ? (
+                          <img src={uploadUrl(asset.src)} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center"><ImageIcon className="h-5 w-5 text-[--text-muted]" /></div>
+                        )}
+                      </div>
+                      <div className="border-t border-[--border-subtle] px-2 py-1 bg-emerald-50 flex items-center gap-1">
+                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                          {panelLabels[i]}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 border-t border-[--border-subtle] px-1.5 py-1">
+                        <button
+                          onClick={() => handleUploadFrame(fieldName)}
+                          disabled={isUploading}
+                          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:bg-[--bg-muted] hover:text-primary disabled:opacity-40 transition-colors"
+                        >
+                          <Upload className="h-2.5 w-2.5" />
+                          {t("common.upload")}
+                        </button>
+                        <div className="flex-1" />
+                        {asset.src && (
+                          <button
+                            onClick={() => handleClearFrame(fieldName)}
+                            className="flex items-center rounded px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:bg-red-50 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="h-2.5 w-2.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           ) : (
             <div className="mb-2.5 space-y-2">
               {(() => {
@@ -1195,7 +1322,6 @@ export function ShotCard({
 
                 const frameItem = isStart ? firstFrameItem : lastFrameItem;
                 const frameHistoryIds = frameItem?.historyIds || [];
-                const frameHistory = frameItem?.history || [];
                 const frameCurrentIdx = frameItem ? frameHistoryIds.indexOf(frameItem.id) : -1;
                 return (
                   <div key={i} className="rounded-lg border border-[--border-subtle] bg-white overflow-hidden">
@@ -1346,14 +1472,16 @@ export function ShotCard({
               ? t("common.generating")
               : generationMode === "reference"
                 ? (hasRefImages ? t("shot.regenerateRefImages") : t("shot.generateRefImages"))
-                : hasFrame ? t("shot.regenerateFrames") : t("project.generateFrames")
+                : generationMode === "4grid"
+                  ? (hasFrame ? "重新生成四宫格帧" : "生成四宫格帧")
+                  : hasFrame ? t("shot.regenerateFrames") : t("project.generateFrames")
             }
           </Button>
         </StepRow>
 
         {/* Step 3: 视频提示词 */}
         <StepRow
-          label={t("shot.stepVideoPrompt")}
+          label={generationMode === "4grid" ? "四宫格视频提示词" : t("shot.stepVideoPrompt")}
           state={promptState}
           isNext={nextStep === "prompt"}
         >
@@ -1391,7 +1519,7 @@ export function ShotCard({
 
         {/* Step 4: 视频 */}
         <StepRow
-          label={t("shot.stepVideo")}
+          label={generationMode === "4grid" ? "四宫格合成视频" : t("shot.stepVideo")}
           state={videoState}
           isNext={nextStep === "video"}
         >
@@ -1447,7 +1575,7 @@ export function ShotCard({
             size="xs"
             variant={nextStep === "video" ? "default" : "outline"}
             onClick={handleGenerateVideo}
-            disabled={generatingVideo || batchGeneratingVideos || isGenerating || (generationMode === "keyframe" && !hasFramePair)}
+            disabled={generatingVideo || batchGeneratingVideos || (generationMode === "keyframe" && !hasFramePair)}
           >
             {(generatingVideo || batchGeneratingVideos || (isGenerating && !hasVideo))
               ? <Loader2 className="h-3 w-3 animate-spin" />

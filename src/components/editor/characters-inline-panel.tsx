@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useModelStore, type ModelRef } from "@/stores/model-store";
 import { useModelGuard } from "@/hooks/use-model-guard";
@@ -11,16 +11,26 @@ import { toast } from "sonner";
 import { ChevronDown, ChevronUp, Sparkles, Loader2, Users } from "lucide-react";
 import Link from "next/link";
 
+type ReferenceLayout = "single" | "three-view" | "four-view";
+
+const LAYOUT_OPTIONS: Array<{ value: ReferenceLayout; label: string; hint: string }> = [
+  { value: "single", label: "单图", hint: "单角色全身立绘" },
+  { value: "three-view", label: "三视图", hint: "正面/侧面/背面" },
+  { value: "four-view", label: "四视图", hint: "正面/3-4/侧面/背面" },
+];
+
 interface Character {
   id: string;
   name: string;
   referenceImage: string | null;
+  referenceImageSingle?: string | null;
+  referenceLayout?: ReferenceLayout | null;
 }
 
 interface CharactersInlinePanelProps {
   characters: Character[];
   projectId: string;
-  generationMode: "keyframe" | "reference";
+  generationMode: "keyframe" | "reference" | "4grid";
   onUpdate: () => void;
 }
 
@@ -41,11 +51,29 @@ export function CharactersInlinePanel({
   const [imageModelRef, setImageModelRef] = useState<ModelRef | null>(() => defaultImageModel);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [layoutMenuFor, setLayoutMenuFor] = useState<string | null>(null);
+  const layoutButtonRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const storageKey = `charPanel:${projectId}`;
   const anyMissingRef = characters.some((c) => !c.referenceImage);
 
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (layoutMenuFor === null) return;
+    function onDocClick(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest("[data-layout-menu]")) return;
+      setLayoutMenuFor(null);
+    }
+    function onScroll() { setLayoutMenuFor(null); }
+    document.addEventListener("mousedown", onDocClick);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [layoutMenuFor]);
 
   useEffect(() => {
     // Auto-expand rule: condition takes precedence over localStorage at mount time
@@ -78,16 +106,17 @@ export function CharactersInlinePanel({
     };
   }
 
-  async function handleGenerate(characterId: string) {
+  async function handleGenerate(characterId: string, layout: ReferenceLayout = "four-view") {
     if (!imageGuard()) return;
     setGeneratingId(characterId);
+    setLayoutMenuFor(null);
     try {
       await apiFetch(`/api/projects/${projectId}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "single_character_image",
-          payload: { characterId },
+          payload: { characterId, referenceLayout: layout },
           modelConfig: { ...getModelConfig(), image: resolveImageRef(imageModelRef) },
         }),
       });
@@ -172,14 +201,48 @@ export function CharactersInlinePanel({
                   <span className="max-w-[80px] truncate text-[11px] text-[--text-muted]">{char.name}</span>
                   {/* Generate button (only when no image) */}
                   {!char.referenceImage && (
-                    <button
-                      onClick={() => handleGenerate(char.id)}
-                      disabled={isGenerating || !!generatingId}
-                      className="flex items-center gap-0.5 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+                    <div
+                      ref={(el) => { if (el) layoutButtonRefs.current.set(char.id, el); else layoutButtonRefs.current.delete(char.id); }}
+                      data-layout-menu
                     >
-                      {isGenerating ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
-                      Gen
-                    </button>
+                      <button
+                        onClick={() => {
+                          if (isGenerating || !!generatingId) return;
+                          setLayoutMenuFor(layoutMenuFor === char.id ? null : char.id);
+                        }}
+                        disabled={isGenerating || !!generatingId}
+                        className="flex items-center gap-0.5 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+                      >
+                        {isGenerating ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
+                        Gen
+                        <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                      </button>
+                      {layoutMenuFor === char.id && (() => {
+                        const el = layoutButtonRefs.current.get(char.id);
+                        if (!el) return null;
+                        const r = el.getBoundingClientRect();
+                        const spaceBelow = window.innerHeight - r.bottom;
+                        const openUp = spaceBelow < 140;
+                        return (
+                          <div
+                            className="fixed z-50 rounded-md border border-[--border-subtle] bg-white p-1 shadow-lg"
+                            style={{ left: Math.max(8, r.left + r.width / 2 - 64), top: openUp ? undefined : r.bottom + 4, bottom: openUp ? window.innerHeight - r.top + 4 : undefined }}
+                            data-layout-menu
+                          >
+                            {LAYOUT_OPTIONS.map((opt) => (
+                              <button
+                                key={opt.value}
+                                onClick={() => handleGenerate(char.id, opt.value)}
+                                className="flex w-full flex-col items-start rounded px-2 py-1 text-left text-[10px] text-[--text-secondary] transition-colors hover:bg-primary/10 hover:text-primary"
+                              >
+                                <span className="font-medium">{opt.label}</span>
+                                <span className="text-[9px] text-[--text-muted]">{opt.hint}</span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   )}
                 </div>
               );

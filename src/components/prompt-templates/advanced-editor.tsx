@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { usePromptTemplateStore } from "@/stores/prompt-template-store";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api-fetch";

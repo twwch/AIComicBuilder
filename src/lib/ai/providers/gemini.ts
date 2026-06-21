@@ -63,10 +63,12 @@ export class GeminiProvider implements AIProvider {
     const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
 
     // Attach reference images (character sheets, first frame, etc.)
-    if (options?.referenceImages?.length) {
+    const geminiRefs = (options?.referenceImages ?? []).slice(0, 6);
+    const geminiLabels = (options?.referenceLabels ?? []).slice(0, 6);
+    if (geminiRefs.length > 0) {
       let imgIndex = 0;
-      for (let ri = 0; ri < options.referenceImages.length; ri++) {
-        const imgPath = options.referenceImages[ri];
+      for (let ri = 0; ri < geminiRefs.length; ri++) {
+        const imgPath = geminiRefs[ri];
         try {
           const resolved = path.resolve(imgPath);
           if (fs.existsSync(resolved)) {
@@ -74,8 +76,8 @@ export class GeminiProvider implements AIProvider {
             const ext = path.extname(resolved).toLowerCase();
             const mimeType = ext === ".png" ? "image/png" : "image/jpeg";
             imgIndex++;
-            const label = options.referenceLabels?.[ri]
-              ? `[Character Reference: ${options.referenceLabels[ri]}]`
+            const label = geminiLabels[ri]
+              ? `[Character Reference: ${geminiLabels[ri]}]`
               : `[Reference Image ${imgIndex}]`;
             parts.push({ text: label });
             parts.push({ inlineData: { mimeType, data } });

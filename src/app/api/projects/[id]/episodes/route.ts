@@ -4,6 +4,7 @@ import { projects, episodes, shots, characters, episodeCharacters } from "@/lib/
 import { eq, asc, and, max, isNotNull, inArray } from "drizzle-orm";
 import { id as genId } from "@/lib/id";
 import { getUserIdFromRequest } from "@/lib/get-user-id";
+import { EpisodeCreateSchema, parseOrThrow } from "@/lib/validation";
 
 async function resolveProject(id: string, userId: string) {
   const [project] = await db
@@ -100,7 +101,8 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const body = (await request.json()) as { title: string; description?: string; keywords?: string };
+  const raw = await request.json();
+  const body = parseOrThrow(EpisodeCreateSchema, raw);
 
   // Get the max sequence number for this project
   const [result] = await db

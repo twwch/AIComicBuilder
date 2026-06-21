@@ -55,93 +55,97 @@ export async function POST(
     `开始创建 ${body.episodes.length} 集和 ${body.characters.length} 个角色`
   );
 
-  // 1. Create all characters (main + guest), build name→id map
-  const charIdByName = new Map<string, string>();
-  for (const char of body.characters) {
-    const charId = genId();
-    await db.insert(characters).values({
-      id: charId,
-      projectId,
-      name: char.name,
-      description: char.description,
-      visualHint: char.visualHint ?? "",
-      scope: char.scope,
-      episodeId: null, // all characters are project-level now
-    });
-    charIdByName.set(char.name.toLowerCase().trim(), charId);
-  }
+  // Pre-compute sequence number for new episodes (read outside transaction)
+  const [seqResult] = await db
+    .select({ maxSeq: max(episodes.sequence) })
+    .from(episodes)
+    .where(eq(episodes.projectId, projectId));
+  let seq = (seqResult?.maxSeq ?? 0) + 1;
 
-  // 1b. Create character relationships
-  if (body.relationships?.length) {
-    for (const rel of body.relationships) {
-      const aId = charIdByName.get(rel.characterA.toLowerCase().trim());
-      const bId = charIdByName.get(rel.characterB.toLowerCase().trim());
-      if (aId && bId && aId !== bId) {
+  // Wrap all insert operations in a transaction so partial failures roll back
+  const created: (typeof episodes.$inferSelect)[] = [];
+  let relationCount = 0;
+  const charIdByName = new Map<string, string>();
+
+await db.transaction(async (tx) => {
+    // 1. Create all characters
+    const charRows = body.characters.map((char) => {
+      const charId = genId();
+      charIdByName.set(char.name.toLowerCase().trim(), charId);
+      return {
+        id: charId,
+        projectId,
+        name: char.name,
+        description: char.description,
+        visualHint: char.visualHint ?? "",
+        scope: char.scope,
+        episodeId: null,
+      };
+    });
+    await tx.insert(characters).values(charRows);
+
+    // 2. Create character relationships
+    if (body.relationships?.length) {
+      const relRows = body.relationships
+        .map((rel) => {
+          const aId = charIdByName.get(rel.characterA.toLowerCase().trim());
+          const bId = charIdByName.get(rel.characterB.toLowerCase().trim());
+          if (aId && bId && aId !== bId) {
+            return {
+              id: genId(),
+              projectId,
+              characterAId: aId,
+              characterBId: bId,
+              relationType: rel.relationType || "neutral",
+              description: rel.description || "",
+            };
+          }
+          return null;
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+      if (relRows.length > 0) {
         try {
-          await db.insert(characterRelations).values({
-            id: genId(),
-            projectId,
-            characterAId: aId,
-            characterBId: bId,
-            relationType: rel.relationType || "neutral",
-            description: rel.description || "",
-          });
+          await tx.insert(characterRelations).values(relRows);
         } catch {
           // skip duplicates
         }
       }
     }
-  }
+
+    // 3. Create episodes
+    const epRows = body.episodes.map((ep) => ({
+      id: genId(),
+      projectId,
+      title: ep.title,
+      description: ep.description || "",
+      keywords: ep.keywords || "",
+      idea: ep.idea || "",
+      sequence: seq++,
+    }));
+    created.push(...(await tx.insert(episodes).values(epRows).returning()));
+
+    // 4. Create episode_characters relations
+    const ecRows = body.episodes.flatMap((epData, i) => {
+      const episodeId = created[i]?.id;
+      if (!episodeId || !epData.characters) return [];
+      return epData.characters
+        .map((charName) => {
+          const charId = charIdByName.get(charName.toLowerCase().trim());
+          if (!charId) return null;
+          relationCount++;
+          return { id: genId(), episodeId, characterId: charId };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+    });
+    if (ecRows.length > 0) {
+      await tx.insert(episodeCharacters).values(ecRows);
+    }
+  });
 
   await addImportLog(
     projectId, 4, "running",
     `已创建 ${body.characters.length} 个角色${body.relationships?.length ? `和 ${body.relationships.length} 个关系` : ""}`
   );
-
-  // 2. Create episodes
-  const [seqResult] = await db
-    .select({ maxSeq: max(episodes.sequence) })
-    .from(episodes)
-    .where(eq(episodes.projectId, projectId));
-
-  let seq = (seqResult?.maxSeq ?? 0) + 1;
-
-  const created = [];
-  for (const ep of body.episodes) {
-    const [row] = await db
-      .insert(episodes)
-      .values({
-        id: genId(),
-        projectId,
-        title: ep.title,
-        description: ep.description || "",
-        keywords: ep.keywords || "",
-        idea: ep.idea || "",
-        sequence: seq++,
-      })
-      .returning();
-    created.push(row);
-  }
-
-  // 3. Create episode_characters relations
-  let relationCount = 0;
-  for (let i = 0; i < body.episodes.length; i++) {
-    const epData = body.episodes[i];
-    const episodeId = created[i]?.id;
-    if (!episodeId || !epData.characters) continue;
-
-    for (const charName of epData.characters) {
-      const charId = charIdByName.get(charName.toLowerCase().trim());
-      if (!charId) continue;
-      await db.insert(episodeCharacters).values({
-        id: genId(),
-        episodeId,
-        characterId: charId,
-      });
-      relationCount++;
-    }
-  }
-
   await addImportLog(
     projectId, 4, "done",
     `导入完成！创建了 ${body.characters.length} 个角色和 ${created.length} 集（${relationCount} 个角色分配）`,

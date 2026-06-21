@@ -4,6 +4,7 @@ import { episodes, projects } from "@/lib/db/schema";
 import { eq, and, inArray, asc } from "drizzle-orm";
 import { assembleVideo } from "@/lib/video/ffmpeg";
 import { getUserIdFromRequest } from "@/lib/get-user-id";
+import { MergeEpisodesSchema, parseOrThrow } from "@/lib/validation";
 
 export async function POST(
   req: NextRequest,
@@ -22,15 +23,9 @@ export async function POST(
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const body = await req.json();
-  const episodeIds: string[] = body.episodeIds;
-
-  if (!Array.isArray(episodeIds) || episodeIds.length < 2) {
-    return NextResponse.json(
-      { error: "At least 2 episodes required" },
-      { status: 400 }
-    );
-  }
+  const raw = await req.json();
+  const body = parseOrThrow(MergeEpisodesSchema, raw);
+  const { episodeIds } = body;
 
   // Fetch episodes, verify ownership and finalVideoUrl
   const selectedEpisodes = await db

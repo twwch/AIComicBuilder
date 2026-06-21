@@ -31,8 +31,12 @@ export function buildRefVideoPromptRequest(params: {
   characters: CharacterRefInfo[];
   sceneFrames: SceneFrameInfo[];
   dialogues?: Array<{ characterName: string; text: string; offscreen?: boolean; visualHint?: string }>;
+  visualStyle?: string;
+  family?: "ltx" | "wan" | "seedance" | "generic";
+  mode?: "default" | "comfyui";
 }): string {
   const lines: string[] = [];
+  const isComfyUI = params.mode === "comfyui";
 
   lines.push(
     `你会收到以下参考图（顺序严格对应 @图片1、@图片2、@图片3 ...，必须使用 \`@图片N\` 形式，**不能**写成 \`@图片N\`）：`
@@ -61,8 +65,10 @@ export function buildRefVideoPromptRequest(params: {
   }
 
   lines.push(`剧本动作：${params.motionScript}`);
+  if (params.visualStyle) lines.push(`视觉风格参考：${params.visualStyle}`);
   lines.push(`机位指令：${params.cameraDirection}`);
-  lines.push(`时长：${params.duration}s`);
+  const maxDur = 15;
+  lines.push(`时长：${Math.min(params.duration, maxDur)}s`);
 
   if (params.dialogues?.length) {
     lines.push(
@@ -80,6 +86,16 @@ export function buildRefVideoPromptRequest(params: {
   lines.push(`4. 每次 @图片N 后面都必须加括号注释角色/场景名，写成 @图片N（名字）的格式`);
   lines.push(`5. 对白（如有）直接写在散文末尾：角色名台词：原文台词（不要 【对白口型】 等标签）`);
   lines.push(`6. 仅输出提示词正文，无前言，无 markdown`);
+  if (params.family === "wan") {
+    lines.push(`7. 当前目标是 Wan 系列模型：优先保证单主体稳定、单动作连续、构图稳定，避免大幅场景跳切和复杂镜头切换。`);
+  }
+  if (params.family === "seedance") {
+    lines.push(`7. 当前目标是 Seedance / 即梦模型：优先使用更自然的中文导演散文，允许 2-4 个动作节拍，但仍保持连贯流动。`);
+  }
+  if (isComfyUI) {
+    lines.push(`8. 这是 ComfyUI Wan 2.2 图生视频提示词，时长范围 3-30 秒 ${params.duration > 10 ? `（当前 ${params.duration}s）` : ""}，动作保留一个核心连续动作，不超过两段跳切`);
+    lines.push(`9. 构图按 480:832 或 832:480 画面设计，主体必须居中稳定，避免超出边缘，避免复杂转场与大范围场景切换`);
+  }
 
   return lines.join("\n");
 }

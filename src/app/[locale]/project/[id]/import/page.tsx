@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, use, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef, use } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import {
@@ -60,7 +60,6 @@ export default function ImportPage({
   const locale = useLocale();
   const router = useRouter();
   const t = useTranslations("import");
-  const tc = useTranslations("common");
   const textGuard = useModelGuard("text");
   const getModelConfig = useModelStore((s) => s.getModelConfig);
 

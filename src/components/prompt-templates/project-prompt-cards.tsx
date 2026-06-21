@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Edit, RotateCcw, FileText } from "lucide-react";
+import { Loader2, Edit, RotateCcw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
 // ── Types ─────────────────────────────────────────────────

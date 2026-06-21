@@ -18,6 +18,11 @@ export const MODEL_MAX_DURATIONS: Record<string, number> = {
   "wan2.6-i2v": 10,
   "wan2.6-r2v": 10,
   "wan2.6-r2v-flash": 10,
+  "ltx-i2v": 30,
+  "ltx-i2v-pro": 30,
+  "ltx-t2v": 30,
+  "ltx-flf2v": 30,
+  "ltx-4grid": 30,
 };
 
 /** Family-level fallback: if modelId contains this substring, use this duration */

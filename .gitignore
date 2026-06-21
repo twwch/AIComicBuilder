@@ -45,10 +45,33 @@ data*/
 *.tsbuildinfo
 next-env.d.ts
 
-.claude
 .superpowers
 
 run_kling.sh
 
 # scratchpad clones (not part of project)
 /tmp/
+
+# GitNexus auto-generated binary index
+.gitnexus/
+
+# misc junk
+*.log
+CLAUDE.md
+.claude/
+.opencode/
+agent-skills/
+LongLive/
+body*.json
+cookies.txt
+curl_pid.txt
+history.json
+query.sql
+project_check.json
+project_full.json
+response_headers.txt
+run_frame_gen.cmd
+test_template.cjs
+_check_*
+check_*
+tmp-*

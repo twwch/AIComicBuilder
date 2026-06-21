@@ -31,13 +31,7 @@ import { shotAssets, shots } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { id as genId } from "@/lib/id";
 import { assertProjectOwnership } from "@/lib/assert-project-ownership";
-
-type ShotAssetType =
-  | "first_frame"
-  | "last_frame"
-  | "reference"
-  | "keyframe_video"
-  | "reference_video";
+import type { ShotAssetType } from "@/lib/shot-asset-utils";
 
 interface AssetPatchItem {
   id?: string;

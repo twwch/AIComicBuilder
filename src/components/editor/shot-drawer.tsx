@@ -29,6 +29,8 @@ import {
   getReferenceVideoUrl,
   getFirstFramePrompt,
   getLastFramePrompt,
+  getPanelUrl,
+  hasAllPanels,
 } from "@/stores/project-store";
 
 type DrawerShot = Shot;
@@ -40,7 +42,8 @@ interface ShotDrawerProps {
   onShotChange: (id: string) => void;
   onUpdate: () => void;
   projectId: string;
-  generationMode: "keyframe" | "reference";
+  episodeId?: string | null;
+  generationMode: "keyframe" | "reference" | "4grid";
   videoRatio: string;
   selectedVersionId: string | null;
   anyGenerating: boolean;
@@ -53,6 +56,7 @@ export function ShotDrawer({
   onShotChange,
   onUpdate,
   projectId,
+  episodeId,
   generationMode,
   videoRatio,
   selectedVersionId,
@@ -118,9 +122,15 @@ export function ShotDrawer({
   const firstFrameUrl = getFirstFrameUrl(shot);
   const lastFrameUrl = getLastFrameUrl(shot);
   const sceneRefFrameUrl = getSceneRefFrameUrl(shot);
+  const panel1Url = getPanelUrl(shot, 1);
+  const panel2Url = getPanelUrl(shot, 2);
+  const panel3Url = getPanelUrl(shot, 3);
+  const panel4Url = getPanelUrl(shot, 4);
   const resolvedVideoUrl = generationMode === "reference" ? getReferenceVideoUrl(shot) : getKeyframeVideoUrl(shot);
-  const hasFrame = !!(sceneRefFrameUrl || firstFrameUrl || lastFrameUrl);
-  const hasFramePair = !!(firstFrameUrl && lastFrameUrl);
+  const hasFrame = generationMode === "4grid"
+    ? !!(panel1Url || panel2Url || panel3Url || panel4Url)
+    : !!(sceneRefFrameUrl || firstFrameUrl || lastFrameUrl);
+  const hasFramePair = generationMode === "4grid" ? hasAllPanels(shot) : !!(firstFrameUrl && lastFrameUrl);
   const hasVideoPrompt = !!shot.videoPrompt;
   const hasVideo = !!resolvedVideoUrl;
   const localGenerating = generatingFrames || generatingSceneFrame || generatingVideo || generatingPrompt || rewritingText;
@@ -138,6 +148,30 @@ export function ShotDrawer({
     }
   }
 
+  async function savePanelPrompt(type: "panel_1" | "panel_4", prompt: string) {
+    if (!shot) return;
+    const existing = shot.assets.find((a) => a.type === type && a.sequenceInType === 0 && a.isActive === 1);
+    try {
+      const resp = await apiFetch(`/api/projects/${projectId}/shots/${shot.id}/assets`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: [{
+            ...(existing ? { id: existing.id } : {}),
+            type,
+            sequenceInType: 0,
+            prompt,
+            ...(existing ? {} : { status: "pending" }),
+          }],
+        }),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      onUpdate();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("common.generationFailed"));
+    }
+  }
+
   async function handleGenerateFrames() {
     if (!imageGuard()) return;
     setGeneratingFrames(true);
@@ -149,6 +183,7 @@ export function ShotDrawer({
           action: "single_frame_generate",
           payload: { shotId: shot!.id, ratio: videoRatio, versionId: selectedVersionId },
           modelConfig: getModelConfig(),
+          episodeId,
         }),
       });
       onUpdate();
@@ -170,6 +205,7 @@ export function ShotDrawer({
           action: "single_scene_frame",
           payload: { shotId: shot!.id, versionId: selectedVersionId },
           modelConfig: getModelConfig(),
+          episodeId,
         }),
       });
       onUpdate();
@@ -190,6 +226,7 @@ export function ShotDrawer({
           action: "single_video_prompt",
           payload: { shotId: shot!.id, versionId: selectedVersionId },
           modelConfig: getModelConfig(),
+          episodeId,
         }),
       });
       onUpdate();
@@ -211,6 +248,7 @@ export function ShotDrawer({
           action: generationMode === "reference" ? "single_reference_video" : "single_video_generate",
           payload: { shotId: shot!.id, ratio: videoRatio, versionId: selectedVersionId },
           modelConfig: getModelConfig(),
+          episodeId,
         }),
       });
       onUpdate();
@@ -241,7 +279,14 @@ export function ShotDrawer({
     }
   }
 
-  const frameAssets = generationMode === "reference"
+  const frameAssets = generationMode === "4grid"
+    ? [
+        { src: panel1Url, label: "PANEL 1（开场）" },
+        { src: panel2Url, label: "PANEL 2（发展）" },
+        { src: panel3Url, label: "PANEL 3（转折）" },
+        { src: panel4Url, label: "PANEL 4（收束）" },
+      ]
+    : generationMode === "reference"
     ? [{ src: sceneRefFrameUrl, label: t("shot.sceneRefFrame") }]
     : [
         { src: firstFrameUrl, label: t("shot.firstFrame") },
@@ -295,14 +340,51 @@ export function ShotDrawer({
           <section>
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[--text-muted]">{t("shot.stepText")}</p>
             <div className="space-y-2">
-              <Textarea
-                value={editPrompt}
-                onChange={(e) => setEditPrompt(e.target.value)}
-                onBlur={() => patchShot({ prompt: editPrompt })}
-                rows={2}
-                placeholder={t("shot.prompt")}
-              />
-              {generationMode === "reference" ? (
+              {generationMode !== "4grid" && (
+                <Textarea
+                  value={editPrompt}
+                  onChange={(e) => setEditPrompt(e.target.value)}
+                  onBlur={() => patchShot({ prompt: editPrompt })}
+                  rows={2}
+                  placeholder={t("shot.prompt")}
+                />
+              )}
+              {generationMode === "4grid" ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Textarea
+                    value={editStartFrame}
+                    onChange={(e) => setEditStartFrame(e.target.value)}
+                    onBlur={() => savePanelPrompt("panel_1", editStartFrame)}
+                    rows={2}
+                    placeholder="PANEL 1（开场）"
+                    className="border-emerald-200 bg-emerald-50/30 text-sm"
+                  />
+                  <Textarea
+                    value={editPrompt}
+                    onChange={(e) => setEditPrompt(e.target.value)}
+                    onBlur={() => patchShot({ prompt: editPrompt })}
+                    rows={2}
+                    placeholder="PANEL 2（发展）"
+                    className="border-emerald-200 bg-emerald-50/30 text-sm"
+                  />
+                  <Textarea
+                    value={editMotionScript}
+                    onChange={(e) => setEditMotionScript(e.target.value)}
+                    onBlur={() => patchShot({ motionScript: editMotionScript })}
+                    rows={2}
+                    placeholder="PANEL 3（转折）"
+                    className="border-emerald-200 bg-emerald-50/30 text-sm"
+                  />
+                  <Textarea
+                    value={editEndFrame}
+                    onChange={(e) => setEditEndFrame(e.target.value)}
+                    onBlur={() => savePanelPrompt("panel_4", editEndFrame)}
+                    rows={2}
+                    placeholder="PANEL 4（收束）"
+                    className="border-emerald-200 bg-emerald-50/30 text-sm"
+                  />
+                </div>
+              ) : generationMode === "reference" ? (
                 <Textarea
                   value={editStartFrame}
                   onChange={(e) => setEditStartFrame(e.target.value)}
@@ -331,14 +413,16 @@ export function ShotDrawer({
                   />
                 </>
               )}
-              <Textarea
-                value={editMotionScript}
-                onChange={(e) => setEditMotionScript(e.target.value)}
-                onBlur={() => patchShot({ motionScript: editMotionScript })}
-                rows={2}
-                placeholder={t("shot.motionScript")}
-                className="border-emerald-200 bg-emerald-50/30 text-sm"
-              />
+              {generationMode !== "4grid" && (
+                <Textarea
+                  value={editMotionScript}
+                  onChange={(e) => setEditMotionScript(e.target.value)}
+                  onBlur={() => patchShot({ motionScript: editMotionScript })}
+                  rows={2}
+                  placeholder={t("shot.motionScript")}
+                  className="border-emerald-200 bg-emerald-50/30 text-sm"
+                />
+              )}
               <input
                 value={editCameraDirection}
                 onChange={(e) => setEditCameraDirection(e.target.value)}
@@ -386,10 +470,10 @@ export function ShotDrawer({
           {/* Step 2: Frames */}
           <section>
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[--text-muted]">
-              {generationMode === "reference" ? t("shot.stepSceneFrame") : t("shot.stepFrames")}
+              {generationMode === "reference" ? t("shot.stepSceneFrame") : generationMode === "4grid" ? "四宫格分镜帧" : t("shot.stepFrames")}
             </p>
             {hasFrame && (
-              <div className="mb-2 flex gap-2">
+              <div className={`mb-2 ${generationMode === "4grid" ? "grid grid-cols-2 gap-2" : "flex gap-2"}`}>
                 {frameAssets.map((asset, i) => (
                   <div
                     key={i}
@@ -397,7 +481,14 @@ export function ShotDrawer({
                     onClick={() => asset.src && setPreviewSrc(uploadUrl(asset.src))}
                   >
                     {asset.src
-                      ? <img src={uploadUrl(asset.src)} className="w-full object-contain" alt={asset.label} />
+                      ? <div>
+                          <img src={uploadUrl(asset.src)} className="w-full object-contain" alt={asset.label} />
+                          {generationMode === "4grid" && (
+                            <div className="border-t border-[--border-subtle] px-2 py-1 bg-emerald-50 text-center">
+                              <span className="text-[9px] font-medium text-emerald-700">{asset.label}</span>
+                            </div>
+                          )}
+                        </div>
                       : <div className="flex h-16 items-center justify-center"><ImageIcon className="h-4 w-4 text-[--text-muted]" /></div>
                     }
                   </div>
@@ -413,14 +504,16 @@ export function ShotDrawer({
               {(generatingFrames || generatingSceneFrame) ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImageIcon className="h-3 w-3" />}
               {(generatingFrames || generatingSceneFrame)
                 ? t("common.generating")
-                : hasFrame ? t("shot.regenerateFrames") : t("project.generateFrames")
+                : generationMode === "4grid"
+                  ? (hasFrame ? "重新生成四宫格帧" : "生成四宫格帧")
+                  : hasFrame ? t("shot.regenerateFrames") : t("project.generateFrames")
               }
             </Button>
           </section>
 
           {/* Step 3: Video Prompt */}
           <section>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[--text-muted]">{t("shot.stepVideoPrompt")}</p>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[--text-muted]">{generationMode === "4grid" ? "四宫格视频提示词" : t("shot.stepVideoPrompt")}</p>
             {hasVideoPrompt && (
               <Textarea
                 value={editVideoPrompt}
@@ -445,7 +538,7 @@ export function ShotDrawer({
 
           {/* Step 4: Video */}
           <section>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[--text-muted]">{t("shot.stepVideo")}</p>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[--text-muted]">{generationMode === "4grid" ? "四宫格合成视频" : t("shot.stepVideo")}</p>
             {hasVideo && (
               <div
                 className="group relative mb-2 overflow-hidden rounded-xl border border-[--border-subtle] bg-black cursor-pointer"
@@ -464,7 +557,7 @@ export function ShotDrawer({
               size="xs"
               variant={hasVideoPrompt && !hasVideo ? "default" : "outline"}
               onClick={handleGenerateVideo}
-              disabled={generatingVideo || (generationMode === "keyframe" && !hasFramePair) || anyGenerating}
+              disabled={generatingVideo || ((generationMode === "keyframe" || generationMode === "4grid") && !hasFramePair) || anyGenerating}
             >
               {generatingVideo ? <Loader2 className="h-3 w-3 animate-spin" /> : <VideoIcon className="h-3 w-3" />}
               {generatingVideo

@@ -44,7 +44,6 @@ export function EpisodeCard({
 
   const hasVideo = !!episode.finalVideoUrl;
   const isProcessing = episode.status === "processing";
-  const isDraft = episode.status === "draft";
   const previewImages = useMemo(() => episode.previewImages ?? [], [episode.previewImages]);
   const hasPreview = previewImages.length > 0;
 

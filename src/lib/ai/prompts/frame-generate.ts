@@ -5,6 +5,7 @@ export function buildFirstFramePrompt(params: {
   startFrameDesc: string;
   characterDescriptions: string;
   previousLastFrame?: string;
+  hasCharacterImageReferences?: boolean;
   slotContents?: Record<string, string>;
 }): string {
   const def = getPromptDefinition("frame_generate_first");
@@ -14,6 +15,7 @@ export function buildFirstFramePrompt(params: {
       startFrameDesc: params.startFrameDesc,
       characterDescriptions: params.characterDescriptions,
       previousLastFrame: params.previousLastFrame,
+      hasCharacterImageReferences: params.hasCharacterImageReferences,
     });
   }
 
@@ -75,6 +77,7 @@ export function buildLastFramePrompt(params: {
   endFrameDesc: string;
   characterDescriptions: string;
   firstFramePath: string;
+  hasCharacterImageReferences?: boolean;
   slotContents?: Record<string, string>;
 }): string {
   const def = getPromptDefinition("frame_generate_last");
@@ -83,6 +86,7 @@ export function buildLastFramePrompt(params: {
       sceneDescription: params.sceneDescription,
       endFrameDesc: params.endFrameDesc,
       characterDescriptions: params.characterDescriptions,
+      hasCharacterImageReferences: params.hasCharacterImageReferences,
     });
   }
 

@@ -88,7 +88,7 @@ export class VeoProvider implements VideoProvider {
     const modeLabel = isKeyframe ? "keyframe" : "image2video";
     console.log(`[Veo] mode=${modeLabel}, model=${this.model}, duration=${durationSeconds}s, ratio=${aspectRatio}`);
 
-    let operation = await this.client.models.generateVideos({
+    const operation = await this.client.models.generateVideos({
       model: this.model,
       prompt: params.prompt,
       image: imageData,
@@ -128,7 +128,7 @@ export class VeoProvider implements VideoProvider {
 
     console.log(`[Veo] mode=referenceImages, model=${this.model}, refCount=${referenceImages.length}, ratio=${aspectRatio}`);
 
-    let operation = await this.client.models.generateVideos({
+    const operation = await this.client.models.generateVideos({
       model: this.model,
       prompt: params.prompt,
       config,

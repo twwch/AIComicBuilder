@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { agents } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getUserIdFromRequest } from "@/lib/get-user-id";
+import { AgentUpdateSchema, parseOrThrow } from "@/lib/validation";
 
 export async function PATCH(
   request: NextRequest,
@@ -10,13 +11,8 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const userId = getUserIdFromRequest(request);
-  const body = (await request.json()) as Partial<{
-    name: string;
-    category: string;
-    appId: string;
-    apiKey: string;
-    description: string;
-  }>;
+  const raw = await request.json();
+  const body = parseOrThrow(AgentUpdateSchema, raw);
 
   const [existing] = await db
     .select()

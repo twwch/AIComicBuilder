@@ -13,7 +13,7 @@ export const projects = sqliteTable("projects", {
     .notNull()
     .default("draft"),
   finalVideoUrl: text("final_video_url"),
-  generationMode: text('generation_mode', { enum: ['keyframe', 'reference'] }).notNull().default('keyframe'),
+  generationMode: text('generation_mode', { enum: ['keyframe', 'reference', '4grid'] }).notNull().default('keyframe'),
   useProjectPrompts: integer("use_project_prompts").notNull().default(0),
   colorPalette: text("color_palette").default(""),
   worldSetting: text("world_setting").default(""),
@@ -42,7 +42,7 @@ export const episodes = sqliteTable("episodes", {
   })
     .notNull()
     .default("draft"),
-  generationMode: text("generation_mode", { enum: ["keyframe", "reference"] })
+  generationMode: text("generation_mode", { enum: ["keyframe", "reference", "4grid"] })
     .notNull()
     .default("keyframe"),
   description: text("description").default(""),
@@ -70,6 +70,12 @@ export const characters = sqliteTable("characters", {
   visualHint: text("visual_hint").default(""),
   referenceImage: text("reference_image"),
   referenceImageHistory: text("reference_image_history").default("[]"),
+  referenceImageSingle: text("reference_image_single"),
+  referenceLayout: text("reference_layout", {
+    enum: ["single", "three-view", "four-view"],
+  })
+    .notNull()
+    .default("four-view"),
   scope: text("scope", { enum: ["main", "guest"] }).notNull().default("main"),
   performanceStyle: text("performance_style").default(""),
   heightCm: integer("height_cm").default(0),
@@ -152,6 +158,10 @@ export const shotAssets = sqliteTable("shot_assets", {
       "reference",
       "keyframe_video",
       "reference_video",
+      "panel_1",
+      "panel_2",
+      "panel_3",
+      "panel_4",
     ],
   }).notNull(),
   sequenceInType: integer("sequence_in_type").notNull().default(0),
@@ -168,6 +178,7 @@ export const shotAssets = sqliteTable("shot_assets", {
   modelProvider: text("model_provider"),
   modelId: text("model_id"),
   meta: text("meta"), // JSON
+  generationId: text("generation_id"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -372,7 +383,7 @@ export const tasks = sqliteTable("tasks", {
     ],
   }).notNull(),
   status: text("status", {
-    enum: ["pending", "running", "completed", "failed"],
+    enum: ["pending", "running", "completed", "failed", "cancelled"],
   })
     .notNull()
     .default("pending"),
@@ -407,6 +418,20 @@ export const agents = sqliteTable("agents", {
     .notNull()
     .$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export const embeddings = sqliteTable("embeddings", {
+  id: text("id").primaryKey(),
+  contentType: text("content_type", {
+    enum: ["character", "shot", "scene", "episode"],
+  }).notNull(),
+  contentId: text("content_id").notNull(),
+  model: text("model").notNull(),
+  vector: text("vector").notNull(),
+  text: text("text").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
 });

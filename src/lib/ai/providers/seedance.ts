@@ -1,6 +1,7 @@
 import type { VideoProvider, VideoGenerateParams, VideoGenerateResult } from "../types";
-import fs from "node:fs";
+import fs, { createWriteStream } from "node:fs";
 import path from "node:path";
+import { pipeline } from "node:stream/promises";
 import { id as genId } from "@/lib/id";
 
 function toDataUrl(filePath: string): string {
@@ -67,6 +68,7 @@ export class SeedanceProvider implements VideoProvider {
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
       }
     );
 
@@ -82,13 +84,12 @@ export class SeedanceProvider implements VideoProvider {
 
     const { videoUrl, lastFrameUrl } = await this.pollForResult(submitResult.id);
 
-    const videoResponse = await fetch(videoUrl);
-    const buffer = Buffer.from(await videoResponse.arrayBuffer());
+    const videoResponse = await fetch(videoUrl, { signal: AbortSignal.timeout(120_000) });
     const filename = `${genId()}.mp4`;
     const dir = path.join(this.uploadDir, "videos");
     fs.mkdirSync(dir, { recursive: true });
     const filepath = path.join(dir, filename);
-    fs.writeFileSync(filepath, buffer);
+    await pipeline(videoResponse.body! as any, createWriteStream(filepath));
 
     return { filePath: filepath, lastFrameUrl };
   }
@@ -163,6 +164,7 @@ export class SeedanceProvider implements VideoProvider {
         `${this.baseUrl}/contents/generations/tasks/${taskId}`,
         {
           headers: { Authorization: `Bearer ${this.apiKey}` },
+          signal: AbortSignal.timeout(15_000),
         }
       );
 
