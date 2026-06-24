@@ -1,15 +1,28 @@
-name: Build and Publish Docker Image
+name: Build, Publish, and Deploy Docker Image
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - feat/**
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy this ref to the server after publishing the image
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/aicomicbuilder
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       packages: write
 
     steps:
@@ -19,24 +32,28 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
-          images: twwch/aicomicbuilder
+          images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=sha-
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -45,9 +62,105 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+  deploy-to-server:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: >
+      (
+        github.ref == 'refs/heads/main' ||
+        (github.event_name == 'workflow_dispatch' && inputs.deploy == true)
+      )
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Compute image tag
+        id: image-tag
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          APP_PORT: ${{ secrets.APP_PORT }}
+          TZ: ${{ secrets.TZ }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+          GHCR_PULL_USERNAME: ${{ secrets.GHCR_PULL_USERNAME }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          KLING_ACCESS_KEY: ${{ secrets.KLING_ACCESS_KEY }}
+          KLING_SECRET_KEY: ${{ secrets.KLING_SECRET_KEY }}
+          SEEDANCE_API_KEY: ${{ secrets.SEEDANCE_API_KEY }}
+          SEEDANCE_BASE_URL: ${{ secrets.SEEDANCE_BASE_URL }}
+          SEEDANCE_MODEL: ${{ secrets.SEEDANCE_MODEL }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+          DASHSCOPE_BASE_URL: ${{ secrets.DASHSCOPE_BASE_URL }}
+          DASHSCOPE_IMAGE_MODEL: ${{ secrets.DASHSCOPE_IMAGE_MODEL }}
+          WAN_API_KEY: ${{ secrets.WAN_API_KEY }}
+          WAN_BASE_URL: ${{ secrets.WAN_BASE_URL }}
+          WAN_MODEL: ${{ secrets.WAN_MODEL }}
         with:
-          body: ${{ github.event.head_commit.message }}
-          generate_release_notes: false
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USERNAME }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          fingerprint: ${{ secrets.DEPLOY_FINGERPRINT }}
+          envs: IMAGE_NAME,IMAGE_TAG,GITHUB_REPOSITORY,GITHUB_REF_NAME,GITHUB_ACTOR,DEPLOY_PATH,APP_PORT,TZ,AUTH_SECRET,DEPLOY_PASSWORD,GHCR_PULL_USERNAME,GHCR_PULL_TOKEN,OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_MODEL,GEMINI_API_KEY,KLING_ACCESS_KEY,KLING_SECRET_KEY,SEEDANCE_API_KEY,SEEDANCE_BASE_URL,SEEDANCE_MODEL,DASHSCOPE_API_KEY,DASHSCOPE_BASE_URL,DASHSCOPE_IMAGE_MODEL,WAN_API_KEY,WAN_BASE_URL,WAN_MODEL
+          script: |
+            set -eu
+
+            if [ -z "${DEPLOY_PATH:-}" ]; then
+              echo "DEPLOY_PATH secret is required"
+              exit 1
+            fi
+
+            if [ -z "${AUTH_SECRET:-}" ]; then
+              echo "AUTH_SECRET secret is required"
+              exit 1
+            fi
+
+            mkdir -p "$DEPLOY_PATH"
+            cd "$DEPLOY_PATH"
+
+            curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/docker-compose.prod.yml" -o docker-compose.prod.yml
+
+            cat > .env.production <<EOF
+            IMAGE_NAME=${IMAGE_NAME}
+            IMAGE_TAG=${IMAGE_TAG}
+            APP_PORT=${APP_PORT:-3000}
+            TZ=${TZ:-Asia/Shanghai}
+            AUTH_SECRET=${AUTH_SECRET}
+            OPENAI_API_KEY=${OPENAI_API_KEY:-}
+            OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+            OPENAI_MODEL=${OPENAI_MODEL:-}
+            GEMINI_API_KEY=${GEMINI_API_KEY:-}
+            KLING_ACCESS_KEY=${KLING_ACCESS_KEY:-}
+            KLING_SECRET_KEY=${KLING_SECRET_KEY:-}
+            SEEDANCE_API_KEY=${SEEDANCE_API_KEY:-}
+            SEEDANCE_BASE_URL=${SEEDANCE_BASE_URL:-}
+            SEEDANCE_MODEL=${SEEDANCE_MODEL:-}
+            DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+            DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL:-}
+            DASHSCOPE_IMAGE_MODEL=${DASHSCOPE_IMAGE_MODEL:-}
+            WAN_API_KEY=${WAN_API_KEY:-}
+            WAN_BASE_URL=${WAN_BASE_URL:-}
+            WAN_MODEL=${WAN_MODEL:-}
+            EOF
+
+            if [ -n "${GHCR_PULL_TOKEN:-}" ]; then
+              echo "${GHCR_PULL_TOKEN}" | docker login ghcr.io -u "${GHCR_PULL_USERNAME:-$GITHUB_ACTOR}" --password-stdin
+            fi
+
+            docker compose --env-file .env.production -f docker-compose.prod.yml pull
+            docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+            docker image prune -f

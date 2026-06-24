@@ -20,6 +20,21 @@
     "upload": "Upload",
     "uploadFailed": "Upload failed. Please try again."
   },
+  "auth": {
+    "loginTitle": "Sign In",
+    "loginSubtitle": "Use a real account to access your AI comic workspace",
+    "registerTitle": "Create Account",
+    "registerSubtitle": "Create an account before sharing this app with your team",
+    "email": "Email",
+    "password": "Password",
+    "passwordPlaceholder": "At least 8 characters",
+    "loginAction": "Sign In",
+    "registerAction": "Register and Continue",
+    "switchToRegister": "No account yet? Create one",
+    "switchToLogin": "Already have an account? Sign in",
+    "logout": "Log out",
+    "unknownError": "Something went wrong. Please try again."
+  },
   "dashboard": {
     "title": "My Projects",
     "newProject": "New Project",

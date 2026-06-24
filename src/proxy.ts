@@ -1,30 +1,47 @@
 import createMiddleware from "next-intl/middleware";
 import { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { routing } from "./i18n/routing";
-
-const COOKIE_NAME = "ai_comic_uid";
+import { SESSION_COOKIE_NAME } from "@/lib/auth/shared";
 
 const intlMiddleware = createMiddleware(routing);
 
 export default function proxy(request: NextRequest) {
-  const response = intlMiddleware(request);
+  const pathname = request.nextUrl.pathname;
 
-  // Ensure ai_comic_uid cookie exists before any page renders.
-  // If missing, set a random UUID so server components can query by userId
-  // on the very first request. The client-side FingerprintProvider will
-  // later overwrite this with the real browser fingerprint if needed.
-  if (!request.cookies.get(COOKIE_NAME)) {
-    const uid = crypto.randomUUID().replace(/-/g, "");
-    response.cookies.set(COOKIE_NAME, uid, {
-      maxAge: 365 * 24 * 60 * 60,
-      path: "/",
-      sameSite: "lax",
-    });
+  if (pathname.startsWith("/api/")) {
+    if (pathname.startsWith("/api/auth/")) {
+      return NextResponse.next();
+    }
+
+    const hasSessionCookie = Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+    if (!hasSessionCookie) {
+      return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
+
+    return NextResponse.next();
+  }
+
+  const response = intlMiddleware(request);
+  const localeMatch = pathname.match(/^\/(zh|en|ja|ko)(\/.*)?$/);
+  if (!localeMatch) return response;
+
+  const locale = localeMatch[1];
+  const suffix = localeMatch[2] ?? "";
+  const isLoginPage = suffix === "/login";
+  const hasSessionCookie = Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+
+  if (!hasSessionCookie && !isLoginPage) {
+    return Response.redirect(new URL(`/${locale}/login`, request.url));
+  }
+
+  if (hasSessionCookie && isLoginPage) {
+    return Response.redirect(new URL(`/${locale}`, request.url));
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
+  matcher: ["/api/uploads/:path*", "/((?!_next|_vercel|.*\\..*).*)"],
 };

@@ -20,6 +20,21 @@
     "upload": "アップロード",
     "uploadFailed": "アップロードに失敗しました。もう一度お試しください。"
   },
+  "auth": {
+    "loginTitle": "ログイン",
+    "loginSubtitle": "正式なアカウントで AI 漫画ワークスペースに入ります",
+    "registerTitle": "アカウント作成",
+    "registerSubtitle": "チームで使う前に、まずアカウントを作成してください",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "passwordPlaceholder": "8文字以上",
+    "loginAction": "ログイン",
+    "registerAction": "登録して続行",
+    "switchToRegister": "アカウントがありませんか？作成する",
+    "switchToLogin": "すでにアカウントがありますか？ログイン",
+    "logout": "ログアウト",
+    "unknownError": "エラーが発生しました。もう一度お試しください。"
+  },
   "dashboard": {
     "title": "マイプロジェクト",
     "newProject": "新規プロジェクト",

@@ -7,6 +7,9 @@ import { getUserIdFromRequest } from "@/lib/get-user-id";
 
 export async function GET(request: Request) {
   const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
   const allProjects = await db
     .select()
     .from(projects)
@@ -17,6 +20,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
   const body = (await request.json()) as { title: string; script?: string };
   const id = genId();
 

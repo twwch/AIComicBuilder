@@ -379,6 +379,13 @@
       "when": 1713148800000,
       "tag": "0053_add_agent_platform",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1713235200000,
+      "tag": "0054_add_auth_tables",
+      "breakpoints": true
     }
   ]
 }

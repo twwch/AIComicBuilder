@@ -8,7 +8,6 @@ import {
   JetBrains_Mono,
 } from "next/font/google";
 import "../globals.css";
-import { FingerprintProvider } from "@/components/fingerprint-provider";
 import { Toaster } from "sonner";
 
 const playfair = Playfair_Display({
@@ -56,7 +55,7 @@ export default async function LocaleLayout({
         suppressHydrationWarning
       >
         <NextIntlClientProvider messages={messages}>
-          <FingerprintProvider>{children}</FingerprintProvider>
+          {children}
           <Toaster position="top-center" theme="dark" />
         </NextIntlClientProvider>
       </body>

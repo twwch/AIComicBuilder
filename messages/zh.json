@@ -20,6 +20,21 @@
     "upload": "上传",
     "uploadFailed": "上传失败，请重试"
   },
+  "auth": {
+    "loginTitle": "登录账号",
+    "loginSubtitle": "使用正式账号进入你的 AI 漫剧工作台",
+    "registerTitle": "创建账号",
+    "registerSubtitle": "先创建一个账号，再开始多人协作使用",
+    "email": "邮箱",
+    "password": "密码",
+    "passwordPlaceholder": "至少 8 位密码",
+    "loginAction": "登录",
+    "registerAction": "注册并进入",
+    "switchToRegister": "还没有账号？创建一个",
+    "switchToLogin": "已有账号？返回登录",
+    "logout": "退出登录",
+    "unknownError": "操作失败，请稍后重试"
+  },
   "dashboard": {
     "title": "我的项目",
     "newProject": "新建项目",

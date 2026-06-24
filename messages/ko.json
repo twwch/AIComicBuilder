@@ -20,6 +20,21 @@
     "upload": "업로드",
     "uploadFailed": "업로드에 실패했습니다. 다시 시도해 주세요."
   },
+  "auth": {
+    "loginTitle": "로그인",
+    "loginSubtitle": "정식 계정으로 AI 만화 작업공간에 들어갑니다",
+    "registerTitle": "계정 만들기",
+    "registerSubtitle": "팀과 함께 사용하기 전에 먼저 계정을 만드세요",
+    "email": "이메일",
+    "password": "비밀번호",
+    "passwordPlaceholder": "8자 이상 입력하세요",
+    "loginAction": "로그인",
+    "registerAction": "가입 후 계속",
+    "switchToRegister": "계정이 없나요? 만들기",
+    "switchToLogin": "이미 계정이 있나요? 로그인",
+    "logout": "로그아웃",
+    "unknownError": "문제가 발생했습니다. 다시 시도해 주세요."
+  },
   "dashboard": {
     "title": "내 프로젝트",
     "newProject": "새 프로젝트",

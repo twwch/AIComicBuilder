@@ -95,44 +95,73 @@ docker run -d \
   -v ./data:/app/data \
   -v ./uploads:/app/uploads \
   --platform linux/amd64 \
-  twwch/aicomicbuilder:latest
+  ghcr.io/zzoling/aicomicbuilder:latest
 ```
 
 启动后在设置页面中配置 AI 模型供应商（OpenAI / Gemini / Seedance）。
 
-### Docker Compose
+### 生产 Docker Compose
 
-创建 `docker-compose.yml`：
-
-```yaml
-services:
-  ai-comic-builder:
-    image: twwch/aicomicbuilder:latest
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./data:/app/data
-      - ./uploads:/app/uploads
-    restart: unless-stopped
-```
+复制环境文件并填写：
 
 ```bash
-docker compose up -d
+cp .env.production.example .env.production
 ```
 
-### 数据持久化
+然后使用仓库内置的生产 compose：
 
-通过 volume 挂载保持数据：
+```yaml
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+```
+
+默认会持久化：
 
 - `./data` — SQLite 数据库文件
-- `./uploads` — 上传的文件及生成的资源（图片、视频等）
+- `./uploads` — 上传文件与生成资源
 
 ### 手动构建镜像
 
 ```bash
-git clone https://github.com/twwch/AIComicBuilder.git
+git clone https://github.com/zzoling/AIComicBuilder.git
 cd AIComicBuilder
 docker build -t ai-comic-builder .
+```
+
+## GitHub Actions 构建镜像并同步服务器
+
+仓库已经包含 `.github/workflows/docker-publish.yml`，它会：
+
+- 在 `main` 和 `feat/**` 分支 push 时构建镜像
+- 把镜像推送到 `ghcr.io/<你的 GitHub 用户名>/aicomicbuilder`
+- 给镜像打上 `latest`、分支名和 `sha-<commit>` 标签
+- 在 `main` push，或手动 `workflow_dispatch` 且勾选 `deploy` 时，通过 SSH 到服务器执行 `docker compose pull && up -d`
+
+要让自动部署生效，你需要在 GitHub 仓库里配置这些 Secrets：
+
+- `DEPLOY_HOST`
+- `DEPLOY_USERNAME`
+- `DEPLOY_SSH_KEY` 或 `DEPLOY_PASSWORD`
+- `DEPLOY_PORT`
+- `DEPLOY_PATH`
+- `AUTH_SECRET`
+
+如果你的服务器现在是密码登录：
+
+- `DEPLOY_PASSWORD` 填服务器登录密码
+- `DEPLOY_SSH_KEY` 可以不填
+
+可选 Secrets：
+
+- `DEPLOY_FINGERPRINT`
+- `GHCR_PULL_USERNAME`
+- `GHCR_PULL_TOKEN`
+- 各家 AI 模型的 API Key / Base URL / Model
+
+如果你暂时不想让 GitHub 直接 SSH 到服务器，也可以只用它构建镜像，然后在服务器执行：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml pull
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d
 ```
 
 ## 生成流水线
