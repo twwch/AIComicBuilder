@@ -252,7 +252,6 @@ export class OpenAIProvider implements AIProvider {
       body: JSON.stringify({
         model,
         n: 1,
-        response_format: "url",
         messages: [{ role: "user", content: promptParts.join("\n") }],
       }),
       signal: AbortSignal.timeout(IMAGE_GENERATION_TIMEOUT_MS),
