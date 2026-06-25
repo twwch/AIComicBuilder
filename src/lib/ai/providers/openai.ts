@@ -239,7 +239,9 @@ export class OpenAIProvider implements AIProvider {
     if (options?.quality) {
       promptParts.push(`Quality target: ${options.quality}.`);
     }
-    promptParts.push("Return the generated image as a direct image URL.");
+    promptParts.push(
+      "Return only a direct image URL in markdown or plain text. Do not return base64, data URLs, or inline image bytes.",
+    );
 
     const response = await fetch(`${baseURL}/chat/completions`, {
       method: "POST",
@@ -249,6 +251,8 @@ export class OpenAIProvider implements AIProvider {
       },
       body: JSON.stringify({
         model,
+        n: 1,
+        response_format: "url",
         messages: [{ role: "user", content: promptParts.join("\n") }],
       }),
       signal: AbortSignal.timeout(IMAGE_GENERATION_TIMEOUT_MS),
