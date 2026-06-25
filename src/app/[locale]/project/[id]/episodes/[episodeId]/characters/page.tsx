@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 import { Users, Sparkles, ImageIcon, Loader2 } from "lucide-react";
 import { InlineModelPicker } from "@/components/editor/model-selector";
-import { apiFetch } from "@/lib/api-fetch";
+import { apiFetch, waitForTask, type ApiTask } from "@/lib/api-fetch";
 import { useModelGuard } from "@/hooks/use-model-guard";
 import { PromptEditButton } from "@/components/prompt-templates/prompt-edit-button";
 import { AgentPicker } from "@/components/agent-picker";
@@ -76,7 +76,18 @@ export default function EpisodeCharactersPage() {
         }),
       });
 
-      const data = await response.json() as { results: Array<{ status: string }> };
+      const data = await response.json() as {
+        tasks?: ApiTask[];
+        results?: Array<{ status: string }>;
+      };
+      if (data.tasks?.length) {
+        const taskResults = await Promise.allSettled(
+          data.tasks.map((task) => waitForTask(task.id))
+        );
+        if (taskResults.some((result) => result.status === "rejected")) {
+          toast.warning(t("common.batchPartialFailed"));
+        }
+      }
       if (data.results?.some((r) => r.status === "error")) {
         toast.warning(t("common.batchPartialFailed"));
       }

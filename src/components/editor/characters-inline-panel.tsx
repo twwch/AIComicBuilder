@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useModelStore, type ModelRef } from "@/stores/model-store";
 import { useModelGuard } from "@/hooks/use-model-guard";
-import { apiFetch } from "@/lib/api-fetch";
+import { apiFetch, waitForTask, type ApiTask } from "@/lib/api-fetch";
 import { uploadUrl } from "@/lib/utils/upload-url";
 import { InlineModelPicker } from "@/components/editor/model-selector";
 import { toast } from "sonner";
@@ -82,7 +82,7 @@ export function CharactersInlinePanel({
     if (!imageGuard()) return;
     setGeneratingId(characterId);
     try {
-      await apiFetch(`/api/projects/${projectId}/generate`, {
+      const response = await apiFetch(`/api/projects/${projectId}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -91,6 +91,8 @@ export function CharactersInlinePanel({
           modelConfig: { ...getModelConfig(), image: resolveImageRef(imageModelRef) },
         }),
       });
+      const task = (await response.json()) as ApiTask;
+      await waitForTask(task.id);
       onUpdate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tCommon("generationFailed"));

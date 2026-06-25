@@ -10,7 +10,7 @@ import { uploadUrl } from "@/lib/utils/upload-url";
 import { useModelStore, type ModelRef } from "@/stores/model-store";
 import { Sparkles, Loader2, Copy, Check, ArrowUpCircle, Trash2, ChevronLeft, ChevronRight, Upload } from "lucide-react";
 import { InlineModelPicker } from "@/components/editor/model-selector";
-import { apiFetch } from "@/lib/api-fetch";
+import { apiFetch, waitForTask, type ApiTask } from "@/lib/api-fetch";
 import { useModelGuard } from "@/hooks/use-model-guard";
 import { toast } from "sonner";
 import { buildCharacterTurnaroundPrompt } from "@/lib/ai/prompts/character-image";
@@ -102,7 +102,8 @@ export function CharacterCard({
           modelConfig: { ...getModelConfig(), image: resolveImageRef(imageModelRef) },
         }),
       });
-      await response.json();
+      const task = (await response.json()) as ApiTask;
+      await waitForTask(task.id);
     } catch (err) {
       console.error("Character image error:", err);
       toast.error(t("common.generationFailed"));

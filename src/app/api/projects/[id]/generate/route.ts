@@ -48,7 +48,6 @@ import { buildSceneFramePrompt } from "@/lib/ai/prompts/scene-frame-generate";
 import { resolveImageProvider, resolveVideoProvider, resolveAIProvider } from "@/lib/ai/provider-factory";
 import { buildVideoPrompt, buildReferenceVideoPrompt } from "@/lib/ai/prompts/video-generate";
 import { buildRefVideoPromptRequest } from "@/lib/ai/prompts/ref-video-prompt-generate";
-import { buildCharacterTurnaroundPrompt } from "@/lib/ai/prompts/character-image";
 import { assembleVideo } from "@/lib/video/ffmpeg";
 import { parseRefImages, serializeRefImages, appendToHistory, type RefImage } from "@/lib/ref-image-utils";
 import {
@@ -212,7 +211,28 @@ export async function POST(
   }
 
   if (action === "single_character_image") {
-    return handleSingleCharacterImage(payload, modelConfig);
+    const characterId = payload?.characterId as string;
+    if (!characterId) {
+      return NextResponse.json({ error: "No characterId provided" }, { status: 400 });
+    }
+    if (!modelConfig?.image) {
+      return NextResponse.json({ error: "No image model configured" }, { status: 400 });
+    }
+    const [character] = await db
+      .select({ id: characters.id })
+      .from(characters)
+      .where(and(eq(characters.id, characterId), eq(characters.projectId, projectId)));
+    if (!character) {
+      return NextResponse.json({ error: "Character not found" }, { status: 404 });
+    }
+    const task = await enqueueTask({
+      type: "character_image",
+      projectId,
+      payload: { characterId, modelConfig },
+      maxRetries: 1,
+      ...(episodeId ? { episodeId } : {}),
+    });
+    return NextResponse.json(task, { status: 201 });
   }
 
   if (action === "batch_character_image") {
@@ -818,87 +838,6 @@ async function handleCharacterExtract(
   return NextResponse.json({ characters: extracted });
 }
 
-// --- single_character_image: generate turnaround image for one character ---
-
-async function handleSingleCharacterImage(
-  payload?: Record<string, unknown>,
-  modelConfig?: ModelConfig
-) {
-  const characterId = payload?.characterId as string;
-  if (!characterId) {
-    return NextResponse.json({ error: "No characterId provided" }, { status: 400 });
-  }
-
-  if (!modelConfig?.image) {
-    return NextResponse.json({ error: "No image model configured" }, { status: 400 });
-  }
-
-  const [character] = await db
-    .select()
-    .from(characters)
-    .where(eq(characters.id, characterId));
-
-  if (!character) {
-    return NextResponse.json({ error: "Character not found" }, { status: 404 });
-  }
-
-  const ai = resolveImageProvider(modelConfig);
-  const prompt = buildCharacterTurnaroundPrompt(character.description || character.name, character.name);
-
-  try {
-    const imagePath = await ai.generateImage(prompt, {
-      size: "2560x1440",
-      aspectRatio: "16:9",
-      quality: "hd",
-    });
-
-    // Append to history
-    let history: string[] = [];
-    try {
-      history = JSON.parse(character.referenceImageHistory || "[]");
-    } catch {}
-    if (character.referenceImage && !history.includes(character.referenceImage)) {
-      history.push(character.referenceImage);
-    }
-    if (!history.includes(imagePath)) {
-      history.push(imagePath);
-    }
-
-    await db
-      .update(characters)
-      .set({ referenceImage: imagePath, referenceImageHistory: JSON.stringify(history) })
-      .where(eq(characters.id, characterId));
-
-    // Mark downstream ref images stale: any shot's referenceImages that include this character
-    // as a "characters" entry should have its generated items reset to pending so they're
-    // regenerated with the new character reference image.
-    const allShots = await db.select().from(shots).where(eq(shots.projectId, character.projectId));
-    const legacyMap = await loadShotLegacyViewsBatch(allShots.map((s) => s.id));
-    let staleCount = 0;
-    for (const shot of allShots) {
-      const view = legacyMap.get(shot.id);
-      if (!view) continue;
-      const refItems = view.referenceImages;
-      let modified = false;
-      for (const item of refItems) {
-        if (item.characters?.includes(character.name) && item.status === "completed") {
-          await patchAsset(item.id, { status: "pending", fileUrl: null });
-          modified = true;
-        }
-      }
-      if (modified) {
-        staleCount++;
-      }
-    }
-    console.log(`[SingleCharacterImage] ${character.name} regenerated; marked ${staleCount} shots' ref images as stale`);
-
-    return NextResponse.json({ characterId, imagePath, status: "ok", staleShots: staleCount });
-  } catch (err) {
-    console.error(`[SingleCharacterImage] Error for ${character.name}:`, err);
-    return NextResponse.json({ characterId, status: "error", error: extractErrorMessage(err) }, { status: 500 });
-  }
-}
-
 // --- batch_character_image: generate turnaround images for all characters ---
 
 async function handleBatchCharacterImage(
@@ -931,37 +870,15 @@ async function handleBatchCharacterImage(
     return NextResponse.json({ results: [], message: "All characters already have images" });
   }
 
-  const ai = resolveImageProvider(modelConfig);
+  const task = await enqueueTask({
+    type: "character_image",
+    projectId,
+    payload: { characterIds: needImages.map((character) => character.id), modelConfig },
+    maxRetries: 1,
+    ...(episodeId ? { episodeId } : {}),
+  });
 
-  const results = await Promise.all(
-    needImages.map(async (character) => {
-      try {
-        const prompt = buildCharacterTurnaroundPrompt(character.description || character.name, character.name);
-        const imagePath = await ai.generateImage(prompt, {
-          size: "2560x1440",
-          aspectRatio: "16:9",
-          quality: "hd",
-        });
-
-        // Append to history
-        let history: string[] = [];
-        try { history = JSON.parse(character.referenceImageHistory || "[]"); } catch {}
-        if (character.referenceImage && !history.includes(character.referenceImage)) history.push(character.referenceImage);
-        if (!history.includes(imagePath)) history.push(imagePath);
-
-        await db
-          .update(characters)
-          .set({ referenceImage: imagePath, referenceImageHistory: JSON.stringify(history) })
-          .where(eq(characters.id, character.id));
-        return { characterId: character.id, name: character.name, imagePath, status: "ok" };
-      } catch (err) {
-        console.error(`[BatchCharacterImage] Error for ${character.name}:`, err);
-        return { characterId: character.id, name: character.name, status: "error", error: extractErrorMessage(err) };
-      }
-    })
-  );
-
-  return NextResponse.json({ results });
+  return NextResponse.json({ tasks: [task] }, { status: 201 });
 }
 
 // --- shot_split: stream shot splitting ---
