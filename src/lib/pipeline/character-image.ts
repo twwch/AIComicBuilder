@@ -6,6 +6,7 @@ import { buildCharacterTurnaroundPrompt } from "@/lib/ai/prompts/character-image
 import { loadShotLegacyViewsBatch, patchAsset } from "@/lib/shot-asset-utils";
 import { and, eq, inArray } from "drizzle-orm";
 import type { Task } from "@/lib/task-queue";
+import { normalizeUploadPath } from "@/lib/utils/upload-path";
 
 async function generateCharacterImage(
   character: typeof characters.$inferSelect,
@@ -14,11 +15,12 @@ async function generateCharacterImage(
   const ai = resolveImageProvider(modelConfig);
   const prompt = buildCharacterTurnaroundPrompt(character.description || character.name, character.name);
 
-  const imagePath = await ai.generateImage(prompt, {
+  const generatedImagePath = await ai.generateImage(prompt, {
     size: "2560x1440",
     aspectRatio: "16:9",
     quality: "hd",
   });
+  const imagePath = normalizeUploadPath(generatedImagePath, process.env.UPLOAD_DIR || "./uploads");
 
   let history: string[] = [];
   try {

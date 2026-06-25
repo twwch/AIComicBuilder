@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { id as genId } from "@/lib/id";
 import { assertProjectOwnership } from "@/lib/assert-project-ownership";
+import { normalizeUploadPath } from "@/lib/utils/upload-path";
 
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 
@@ -39,6 +40,7 @@ export async function POST(
   fs.mkdirSync(dir, { recursive: true });
   const filepath = path.join(dir, filename);
   fs.writeFileSync(filepath, buffer);
+  const referenceImage = normalizeUploadPath(filepath, uploadDir);
 
   // Append to history
   let history: string[] = [];
@@ -48,13 +50,13 @@ export async function POST(
   if (character.referenceImage && !history.includes(character.referenceImage)) {
     history.push(character.referenceImage);
   }
-  if (!history.includes(filepath)) {
-    history.push(filepath);
+  if (!history.includes(referenceImage)) {
+    history.push(referenceImage);
   }
 
   const [updated] = await db
     .update(characters)
-    .set({ referenceImage: filepath, referenceImageHistory: JSON.stringify(history) })
+    .set({ referenceImage, referenceImageHistory: JSON.stringify(history) })
     .where(eq(characters.id, characterId))
     .returning();
 
