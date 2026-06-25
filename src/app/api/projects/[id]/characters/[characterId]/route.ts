@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { characters } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { assertProjectOwnership } from "@/lib/assert-project-ownership";
+import { normalizeUploadPath } from "@/lib/utils/upload-path";
 
 export async function PATCH(
   request: Request,
@@ -36,7 +37,12 @@ export async function PATCH(
   if (body.name !== undefined) updateData.name = body.name;
   if (body.description !== undefined) updateData.description = body.description;
   if (body.visualHint !== undefined) updateData.visualHint = body.visualHint;
-  if (body.referenceImage !== undefined) updateData.referenceImage = body.referenceImage;
+  if (body.referenceImage !== undefined) {
+    updateData.referenceImage = normalizeUploadPath(
+      body.referenceImage,
+      process.env.UPLOAD_DIR || "./uploads",
+    );
+  }
   if (body.scope !== undefined) {
     updateData.scope = body.scope;
     if (body.scope === "main") {
