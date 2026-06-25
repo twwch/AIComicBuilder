@@ -160,11 +160,11 @@ export function CharacterCard({
             onUpdate();
           }
           return (
-            <div className="relative w-full aspect-video overflow-hidden rounded-xl cursor-pointer group" onClick={() => setLightbox(true)}>
+            <div className="relative w-full aspect-video overflow-hidden rounded-xl bg-white cursor-pointer group" onClick={() => setLightbox(true)}>
               <img
                 src={uploadUrl(referenceImage)}
                 alt={name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
               {showArrows && (
                 <>
