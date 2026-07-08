@@ -18,9 +18,9 @@ export default function PromptSettingsPage() {
   const isProject = scope === "project" && !!projectId;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-screen flex-col overflow-hidden bg-frame-grid">
       {/* Header */}
-      <header className="sticky top-0 z-30 flex h-14 flex-shrink-0 items-center justify-between border-b border-[--border-subtle] bg-white/80 backdrop-blur-xl px-4 lg:px-6">
+      <header className="sticky top-0 z-30 flex h-14 flex-shrink-0 items-center justify-between border-b border-[--border-subtle] bg-[#070A10]/88 px-4 backdrop-blur-xl lg:px-6">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
@@ -29,11 +29,11 @@ export default function PromptSettingsPage() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-[--brand-cyan] via-[--brand-blue] to-[--brand-violet] text-white shadow-[0_0_18px_rgba(47,107,255,0.35)]">
               <Wand2 className="h-3.5 w-3.5" />
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-display text-sm font-semibold text-[--text-primary]">
+              <span className="frame-gradient-text font-display text-sm font-extrabold">
                 {t("title")}
               </span>
               {isProject ? (
@@ -51,7 +51,7 @@ export default function PromptSettingsPage() {
         <LanguageSwitcher />
       </header>
 
-      <main className="flex flex-1 flex-col overflow-hidden bg-[--surface] p-4 lg:p-6">
+      <main className="flex flex-1 flex-col overflow-hidden bg-transparent p-4 lg:p-6">
         <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-hidden animate-page-in">
           <PromptEditor
             scope={scope}

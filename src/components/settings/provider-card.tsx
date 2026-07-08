@@ -27,8 +27,8 @@ export function ProviderCard({
       onKeyDown={(e) => e.key === "Enter" || e.key === " " ? onSelect() : undefined}
       className={`group relative flex flex-shrink-0 cursor-pointer items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left transition-all duration-200 ${
         selected
-          ? "border-primary/30 bg-primary/5 shadow-sm shadow-primary/5"
-          : "border-[--border-subtle] bg-white hover:border-[--border-hover] hover:shadow-sm"
+          ? "border-primary/50 bg-primary/10 shadow-sm shadow-primary/10"
+          : "border-[--border-subtle] bg-[--surface]/60 hover:border-primary/40 hover:shadow-sm"
       }`}
     >
       <div

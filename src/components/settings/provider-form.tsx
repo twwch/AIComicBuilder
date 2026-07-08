@@ -21,6 +21,7 @@ const DEFAULT_BASE_URLS: Record<Protocol, string> = {
   kling: "https://api.klingai.com",
   wan: "https://dashscope.aliyuncs.com/api/v1",
   dashscope: "https://dashscope.aliyuncs.com/api/v1",
+  "jimapi-video": "https://www.jimapi.com/v1",
 };
 
 function getProtocolOptions(capability: Capability): { value: Protocol; label: string }[] {
@@ -44,6 +45,7 @@ function getProtocolOptions(capability: Capability): { value: Protocol; label: s
     { value: "ucloud-seedance", label: "Seedance (UCloud)" },
     { value: "gemini", label: "Gemini (Veo)" },
     { value: "kling", label: "Kling" },
+    { value: "jimapi-video", label: "JimAPI Video" },
     { value: "wan", label: "百炼 (视频)" },
   ];
 }
@@ -64,6 +66,7 @@ export function ProviderForm({ provider }: ProviderFormProps) {
   const [modelSearch, setModelSearch] = useState("");
 
   const isKling = provider.protocol === "kling";
+  const canFetchWithoutApiKey = isKling || provider.protocol === "jimapi-video";
 
   async function handleFetchModels() {
     setFetching(true);
@@ -248,7 +251,7 @@ export function ProviderForm({ provider }: ProviderFormProps) {
             size="sm"
             variant="outline"
             onClick={handleFetchModels}
-            disabled={fetching || (!provider.apiKey && provider.protocol !== "kling")}
+            disabled={fetching || (!provider.apiKey && !canFetchWithoutApiKey)}
           >
             {fetching ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -322,7 +325,7 @@ export function ProviderForm({ provider }: ProviderFormProps) {
                   <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
                     {filtered.map((model) => (
                       <label
-                        key={model.id}
+                        key={`${provider.id}:${model.id}`}
                         className={`group/item flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
                           model.checked
                             ? "bg-primary/5"

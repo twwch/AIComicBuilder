@@ -36,6 +36,10 @@ export function useModelGuard(capability: Capability): () => boolean {
     const config = getModelConfig();
 
     if (config[capability] === null) {
+      if (capability === "text") {
+        return true;
+      }
+
       toast.warning(t(messageKeys[capability]), {
         action: {
           label: t("goSettings"),

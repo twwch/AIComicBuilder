@@ -7,8 +7,10 @@ import { KlingVideoProvider } from "./providers/kling-video";
 import { WanVideoProvider } from "./providers/wan-video";
 import { UCloudSeedanceProvider } from "./providers/ucloud-seedance";
 import { DashScopeImageProvider } from "./providers/dashscope-image";
+import { JimApiVideoProvider } from "./providers/jimapi-video";
 import { getAIProvider, getVideoProvider } from "./index";
 import type { AIProvider, VideoProvider } from "./types";
+import { KeyPoolAIProvider, splitConfiguredKeys } from "./key-pool";
 
 interface ProviderConfig {
   protocol: string;
@@ -24,7 +26,25 @@ export interface ModelConfigPayload {
   video?: ProviderConfig | null;
 }
 
-export function createAIProvider(config: ProviderConfig, uploadDir?: string): AIProvider {
+function getImagePoolEnv(protocol: string) {
+  switch (protocol) {
+    case "openai":
+      return { apiKeysEnv: ["OPENAI_API_KEYS", "OPENAI_API_KEY"] };
+    case "gemini":
+      return { apiKeysEnv: ["GEMINI_API_KEYS", "GEMINI_API_KEY"] };
+    case "kling":
+      return {
+        apiKeysEnv: ["KLING_ACCESS_KEYS", "KLING_ACCESS_KEY"],
+        secretKeysEnv: ["KLING_SECRET_KEYS", "KLING_SECRET_KEY"],
+      };
+    case "dashscope":
+      return { apiKeysEnv: ["DASHSCOPE_API_KEYS", "DASHSCOPE_API_KEY"] };
+    default:
+      return { apiKeysEnv: [] };
+  }
+}
+
+function createSingleAIProvider(config: ProviderConfig, uploadDir?: string): AIProvider {
   switch (config.protocol) {
     case "openai":
       return new OpenAIProvider({
@@ -60,6 +80,40 @@ export function createAIProvider(config: ProviderConfig, uploadDir?: string): AI
   }
 }
 
+export function createAIProvider(config: ProviderConfig, uploadDir?: string): AIProvider {
+  const poolEnv = getImagePoolEnv(config.protocol);
+  const entries = splitConfiguredKeys({
+    apiKey: config.apiKey,
+    secretKey: config.secretKey,
+    apiKeysEnv: poolEnv.apiKeysEnv,
+    secretKeysEnv: poolEnv.secretKeysEnv,
+    labelPrefix: config.protocol,
+  });
+
+  if (entries.length <= 1) {
+    return createSingleAIProvider(
+      {
+        ...config,
+        apiKey: entries[0]?.apiKey ?? config.apiKey,
+        secretKey: entries[0]?.secretKey ?? config.secretKey,
+      },
+      uploadDir,
+    );
+  }
+
+  console.log(`[ImageKeyPool] ${config.protocol}: loaded ${entries.length} API keys`);
+  return new KeyPoolAIProvider(entries, (entry) =>
+    createSingleAIProvider(
+      {
+        ...config,
+        apiKey: entry.apiKey,
+        secretKey: entry.secretKey ?? config.secretKey,
+      },
+      uploadDir,
+    ),
+  );
+}
+
 export function createVideoProvider(config: ProviderConfig, uploadDir?: string): VideoProvider {
   switch (config.protocol) {
     case "seedance":
@@ -93,6 +147,13 @@ export function createVideoProvider(config: ProviderConfig, uploadDir?: string):
       });
     case "ucloud-seedance":
       return new UCloudSeedanceProvider({
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl,
+        model: config.modelId,
+        ...(uploadDir && { uploadDir }),
+      });
+    case "jimapi-video":
+      return new JimApiVideoProvider({
         apiKey: config.apiKey,
         baseUrl: config.baseUrl,
         model: config.modelId,

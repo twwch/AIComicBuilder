@@ -32,7 +32,7 @@ export function ProjectNav({ projectId, episodeId }: ProjectNavProps) {
     <>
       {/* Desktop sidebar — stays fixed relative to the header (h-14),
           doesn't scroll with the main content on the right. */}
-      <nav className="hidden w-60 flex-shrink-0 border-r border-[--border-subtle] bg-white lg:block self-start sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto">
+      <nav className="hidden w-60 flex-shrink-0 border-r border-[--border-subtle] bg-[#070A10]/88 backdrop-blur-xl lg:block self-start sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto">
         <div className="flex flex-col gap-1 p-3 pt-4">
           <Link
             href={`/${locale}/project/${projectId}/episodes`}
@@ -54,7 +54,7 @@ export function ProjectNav({ projectId, episodeId }: ProjectNavProps) {
                 className={cn(
                   "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-primary/8 text-primary"
+                    ? "border border-primary/35 bg-primary/12 text-primary shadow-[0_0_24px_rgba(47,107,255,0.16)]"
                     : "text-[--text-secondary] hover:bg-[--surface] hover:text-[--text-primary]"
                 )}
               >
@@ -65,7 +65,7 @@ export function ProjectNav({ projectId, episodeId }: ProjectNavProps) {
                   className={cn(
                     "flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold transition-all duration-200",
                     isActive
-                      ? "bg-primary text-white shadow-sm shadow-primary/25"
+                      ? "bg-gradient-to-br from-[--brand-cyan] via-[--brand-blue] to-[--brand-violet] text-white shadow-sm shadow-primary/25"
                       : "bg-[--surface] text-[--text-muted] group-hover:bg-primary/10 group-hover:text-primary"
                   )}
                 >
@@ -80,7 +80,7 @@ export function ProjectNav({ projectId, episodeId }: ProjectNavProps) {
       </nav>
 
       {/* Mobile bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[--border-subtle] bg-white/95 backdrop-blur-md lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[--border-subtle] bg-[#070A10]/92 backdrop-blur-md lg:hidden">
         <div className="flex items-center justify-around py-1.5">
           {tabs.map((tab, i) => {
             const isActive = pathname === tab.href;

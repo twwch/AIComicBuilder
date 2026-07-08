@@ -20,6 +20,14 @@ import { toast } from "sonner";
 const ACCEPTED = ".txt,.docx,.pdf,.md,.markdown";
 const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
 
+interface IntakeJobStatus {
+  status: "queued" | "running" | "awaiting_review" | "confirmed" | "failed" | "cancelled";
+  progress: number;
+  current_stage: string;
+  candidate_text?: string;
+  error_message?: string;
+}
+
 interface UploadScriptDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,8 +49,13 @@ export function UploadScriptDialog({
   const [file, setFile] = useState<File | null>(null);
   const [targetMinutes, setTargetMinutes] = useState(10);
   const [uploading, setUploading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [intakeJobId, setIntakeJobId] = useState("");
+  const [intakeStatus, setIntakeStatus] = useState<IntakeJobStatus | null>(null);
+  const [candidateText, setCandidateText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const pollingRef = useRef(false);
 
   const handleFile = useCallback((f: File) => {
     if (f.size > MAX_SIZE) {
@@ -67,14 +80,17 @@ export function UploadScriptDialog({
     if (!textGuard()) return;
 
     setUploading(true);
+    setCandidateText("");
+    setIntakeStatus(null);
     try {
       const form = new FormData();
       form.append("file", file);
       form.append("targetMinutes", String(targetMinutes));
       form.append("modelConfig", JSON.stringify(getModelConfig()));
+      form.append("allowAiOverwrite", "true");
 
       const res = await apiFetch(
-        `/api/projects/${projectId}/upload-script`,
+        `/api/projects/${projectId}/script/intake/start`,
         { method: "POST", body: form }
       );
 
@@ -84,9 +100,9 @@ export function UploadScriptDialog({
       }
 
       const data = await res.json();
-      toast.success(t("success", { count: data.count }));
-      onOpenChange(false);
-      onComplete();
+      setIntakeJobId(data.jobId);
+      toast.success(t("queued"));
+      await pollIntakeJob(data.jobId);
     } catch (err) {
       console.error("Upload script error:", err);
       toast.error(
@@ -97,11 +113,72 @@ export function UploadScriptDialog({
     }
   }
 
+  async function pollIntakeJob(jobId: string) {
+    pollingRef.current = true;
+    while (pollingRef.current) {
+      const res = await apiFetch(`/api/projects/${projectId}/script/intake/jobs/${jobId}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to load intake job");
+      }
+      const status = await res.json() as IntakeJobStatus;
+      setIntakeStatus(status);
+
+      if (status.status === "failed") {
+        throw new Error(status.error_message || "Script intake failed");
+      }
+      if (status.status === "awaiting_review") {
+        setCandidateText(status.candidate_text || "");
+        toast.success(t("reviewReady"));
+        return;
+      }
+      if (status.status === "confirmed") {
+        toast.success(t("confirmed"));
+        onOpenChange(false);
+        onComplete();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+  }
+
+  async function handleConfirm() {
+    if (!intakeJobId || confirming) return;
+    setConfirming(true);
+    try {
+      const res = await apiFetch(
+        `/api/projects/${projectId}/script/intake/jobs/${intakeJobId}/confirm`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: candidateText }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Confirm failed");
+      }
+      toast.success(t("confirmed"));
+      onOpenChange(false);
+      onComplete();
+    } catch (err) {
+      console.error("Confirm script intake error:", err);
+      toast.error(err instanceof Error ? err.message : tc("generationFailed"));
+    } finally {
+      setConfirming(false);
+    }
+  }
+
   function resetState() {
     setFile(null);
     setTargetMinutes(10);
     setUploading(false);
+    setConfirming(false);
     setDragOver(false);
+    setIntakeJobId("");
+    setIntakeStatus(null);
+    setCandidateText("");
+    pollingRef.current = false;
   }
 
   return (
@@ -181,7 +258,31 @@ export function UploadScriptDialog({
             )}
           </div>
 
+          {intakeStatus && (
+            <div className="rounded-lg border border-[--border-subtle] bg-[--surface] p-3">
+              <div className="mb-2 flex items-center justify-between text-xs text-[--text-muted]">
+                <span>{intakeStatus.current_stage}</span>
+                <span>{intakeStatus.progress}%</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-black/10">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${Math.min(100, Math.max(0, intakeStatus.progress))}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {candidateText && (
+            <textarea
+              value={candidateText}
+              onChange={(e) => setCandidateText(e.target.value)}
+              className="min-h-[240px] w-full resize-y rounded-lg border border-[--border-subtle] bg-[--surface] p-3 text-sm text-[--text-primary] outline-none focus:border-primary"
+            />
+          )}
+
           {/* Duration slider */}
+          {!candidateText && (
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="text-sm font-medium text-[--text-primary]">
@@ -205,12 +306,25 @@ export function UploadScriptDialog({
               <span>20 {t("minutes")}</span>
             </div>
           </div>
+          )}
         </div>
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>
             {tc("cancel")}
           </DialogClose>
+          {candidateText ? (
+            <Button onClick={handleConfirm} disabled={confirming || !candidateText.trim()}>
+              {confirming ? (
+                <>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  {t("confirming")}
+                </>
+              ) : (
+                t("confirm")
+              )}
+            </Button>
+          ) : (
           <Button onClick={handleSubmit} disabled={!file || uploading}>
             {uploading ? (
               <>
@@ -224,6 +338,7 @@ export function UploadScriptDialog({
               </>
             )}
           </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

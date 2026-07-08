@@ -1,8 +1,13 @@
 import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
-import { eq, asc, sql } from "drizzle-orm";
+import { and, eq, asc, lt, sql } from "drizzle-orm";
 import { id as genId } from "@/lib/id";
 import type { TaskType } from "./types";
+
+const RUNNING_TASK_RECOVERY_STALE_MS = Math.max(
+  60_000,
+  Number.parseInt(process.env.TASK_RUNNING_RECOVERY_STALE_MS ?? "", 10) || 30 * 60_000,
+);
 
 export async function enqueueTask(params: {
   type: NonNullable<TaskType>;
@@ -37,7 +42,7 @@ export async function dequeueTask(): Promise<
   // Finds the first pending task that is either unscheduled or due, and atomically sets it to "running".
   const [task] = await db
     .update(tasks)
-    .set({ status: "running" })
+    .set({ status: "running", error: null })
     .where(
       eq(
         tasks.id,
@@ -47,6 +52,17 @@ export async function dequeueTask(): Promise<
     .returning();
 
   return task || null;
+}
+
+export async function recoverRunningTasks(staleMs = RUNNING_TASK_RECOVERY_STALE_MS) {
+  const cutoff = new Date(Date.now() - staleMs);
+  await db
+    .update(tasks)
+    .set({
+      status: "pending",
+      error: "Recovered from worker restart",
+    })
+    .where(and(eq(tasks.status, "running"), lt(tasks.createdAt, cutoff)));
 }
 
 export async function completeTask(id: string, result: unknown) {

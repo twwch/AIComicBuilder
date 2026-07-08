@@ -72,8 +72,8 @@ function SelectTrigger({ size = "default", className }: SelectTriggerProps) {
       value={value ?? ""}
       onChange={(e) => onValueChange?.(e.target.value)}
       className={cn(
-        "rounded-lg border border-border bg-transparent text-[--text-secondary] outline-none transition-colors cursor-pointer",
-        "hover:bg-[--surface-hover] hover:text-[--text-primary] hover:border-[--border-hover]",
+        "rounded-lg border border-[--border-subtle] bg-[--surface]/70 text-[--text-secondary] outline-none transition-colors cursor-pointer",
+        "hover:bg-[--surface-hover] hover:text-[--text-primary] hover:border-primary/45",
         "focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2",
         "disabled:pointer-events-none disabled:opacity-40",
         size === "sm" ? "h-8 px-2 text-[13px]" : "h-9 px-3 text-sm",

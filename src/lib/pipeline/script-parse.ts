@@ -36,18 +36,5 @@ export async function handleScriptParse(task: Task) {
     .set({ updatedAt: new Date() })
     .where(eq(projects.id, payload.projectId));
 
-  // Auto-enqueue character extraction now that screenplay is parsed
-  const { enqueueTask } = await import("@/lib/task-queue");
-  await enqueueTask({
-    type: "character_extract",
-    projectId: payload.projectId,
-    payload: {
-      projectId: payload.projectId,
-      screenplay: result,
-      modelConfig: payload.modelConfig,
-      userId: payload.userId,
-    },
-  });
-
   return screenplay;
 }

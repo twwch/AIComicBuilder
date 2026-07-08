@@ -23,6 +23,7 @@ interface ProjectCardProps {
   title: string;
   status: string;
   createdAt: string;
+  href?: string;
 }
 
 const statusConfig: Record<string, { dot: string; text: string; bg: string }> = {
@@ -32,18 +33,18 @@ const statusConfig: Record<string, { dot: string; text: string; bg: string }> = 
     bg: "bg-[--surface]",
   },
   processing: {
-    dot: "bg-[#F59E0B] animate-status-pulse",
-    text: "text-[#B45309]",
-    bg: "bg-[#FFFBEB]",
+    dot: "bg-[--brand-orange] animate-status-pulse",
+    text: "text-[--brand-orange]",
+    bg: "bg-[--brand-orange]/12",
   },
   completed: {
     dot: "bg-[--success]",
-    text: "text-[#047857]",
-    bg: "bg-[#ECFDF5]",
+    text: "text-[--success]",
+    bg: "bg-[--success]/12",
   },
 };
 
-export function ProjectCard({ id, title, status, createdAt }: ProjectCardProps) {
+export function ProjectCard({ id, title, status, createdAt, href }: ProjectCardProps) {
   const t = useTranslations("dashboard");
   const tc = useTranslations("common");
   const locale = useLocale();
@@ -68,8 +69,9 @@ export function ProjectCard({ id, title, status, createdAt }: ProjectCardProps) 
 
   return (
     <>
-      <Link href={`/${locale}/project/${id}/episodes`} className="group block">
-        <div className="relative flex flex-col rounded-xl border border-[--border-subtle] bg-white p-4 transition-all duration-200 hover:border-[--border-hover] hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+      <Link href={href ?? `/${locale}/project/${id}/episodes`} className="group block">
+        <div className="frame-panel relative flex flex-col overflow-hidden rounded-lg p-4 transition-all duration-200 hover:border-primary/55 hover:shadow-[0_0_0_1px_rgba(32,214,255,0.16),0_18px_55px_rgba(47,107,255,0.18)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[--brand-cyan] to-transparent opacity-60" />
           {/* Delete button — top right */}
           <button
             onClick={(e) => {
@@ -77,7 +79,7 @@ export function ProjectCard({ id, title, status, createdAt }: ProjectCardProps) 
               e.stopPropagation();
               setDeleteOpen(true);
             }}
-            className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-lg text-[--text-muted] opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+            className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-lg text-[--text-muted] opacity-0 transition-all hover:bg-red-500/12 hover:text-red-400 group-hover:opacity-100"
             title={tc("delete")}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -85,7 +87,7 @@ export function ProjectCard({ id, title, status, createdAt }: ProjectCardProps) 
 
           {/* Icon + Title */}
           <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary shadow-[inset_0_0_0_1px_rgba(91,140,255,0.24)] transition-colors group-hover:bg-primary group-hover:text-white">
               {status === "completed" ? (
                 <CircleCheck className="h-4 w-4" />
               ) : status === "processing" ? (
@@ -95,7 +97,7 @@ export function ProjectCard({ id, title, status, createdAt }: ProjectCardProps) 
               )}
             </div>
             <div className="min-w-0 flex-1 pr-6">
-              <h3 className="font-display text-sm font-semibold leading-snug text-[--text-primary] truncate">
+              <h3 className="font-display text-sm font-extrabold leading-snug text-[--text-primary] truncate">
                 {title}
               </h3>
               <div className="mt-1 flex items-center gap-1 text-[11px] text-[--text-muted]">

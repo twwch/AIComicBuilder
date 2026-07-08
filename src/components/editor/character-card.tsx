@@ -7,13 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslations } from "next-intl";
 import { uploadUrl } from "@/lib/utils/upload-url";
-import { useModelStore, type ModelRef } from "@/stores/model-store";
-import { Sparkles, Loader2, Copy, Check, ArrowUpCircle, Trash2, ChevronLeft, ChevronRight, Upload } from "lucide-react";
-import { InlineModelPicker } from "@/components/editor/model-selector";
+import { Images, Loader2, ArrowUpCircle, Trash2, ChevronLeft, ChevronRight, Upload } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
-import { useModelGuard } from "@/hooks/use-model-guard";
 import { toast } from "sonner";
-import { buildCharacterTurnaroundPrompt } from "@/lib/ai/prompts/character-image";
 
 interface CharacterCardProps {
   id: string;
@@ -47,10 +43,6 @@ export function CharacterCard({
   episodeName,
 }: CharacterCardProps) {
   const t = useTranslations();
-  const getModelConfig = useModelStore((s) => s.getModelConfig);
-  const providers = useModelStore((s) => s.providers);
-  const defaultImageModel = useModelStore((s) => s.defaultImageModel);
-  const [imageModelRef, setImageModelRef] = useState<ModelRef | null>(() => defaultImageModel);
   const [editName, setEditName] = useState(name);
   const [editDesc, setEditDesc] = useState(description);
   const [editVisualHint, setEditVisualHint] = useState(visualHint ?? "");
@@ -59,25 +51,40 @@ export function CharacterCard({
   useEffect(() => { setEditName(name); }, [name]);
   useEffect(() => { setEditDesc(description); }, [description]);
   useEffect(() => { setEditVisualHint(visualHint ?? ""); }, [visualHint]);
-  const [generating, setGenerating] = useState(false);
+  const [switchingImage, setSwitchingImage] = useState(false);
   const [lightbox, setLightbox] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const imageGuard = useModelGuard("image");
-  const isGenerating = generating || (!!batchGenerating && !referenceImage);
+  const isLoadingImage = !!batchGenerating && !referenceImage;
 
-  function resolveImageRef(ref: ModelRef | null) {
-    if (!ref) return null;
-    const provider = providers.find((p) => p.id === ref.providerId);
-    if (!provider) return null;
-    return {
-      protocol: provider.protocol,
-      baseUrl: provider.baseUrl,
-      apiKey: provider.apiKey,
-      secretKey: provider.secretKey,
-      modelId: ref.modelId,
-    };
+  function getImageHistory() {
+    let history: string[] = [];
+    try {
+      history = JSON.parse(referenceImageHistory || "[]");
+    } catch {}
+    if (referenceImage && !history.includes(referenceImage)) {
+      history = [referenceImage, ...history];
+    }
+    return [...new Set(history.filter(Boolean))];
+  }
+
+  const imageHistory = getImageHistory();
+  const currentImageIndex = referenceImage ? imageHistory.indexOf(referenceImage) : -1;
+
+  async function switchToImage(newPath: string) {
+    setSwitchingImage(true);
+    try {
+      await apiFetch(`/api/projects/${projectId}/characters/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ referenceImage: newPath }),
+      });
+      onUpdate();
+    } catch (err) {
+      console.error("Character image switch error:", err);
+      toast.error(t("common.uploadFailed"));
+    }
+    setSwitchingImage(false);
   }
 
   async function handleSave() {
@@ -89,26 +96,12 @@ export function CharacterCard({
     onUpdate();
   }
 
-  async function handleGenerateImage() {
-    if (!imageGuard()) return;
-    setGenerating(true);
-    try {
-      const response = await apiFetch(`/api/projects/${projectId}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "single_character_image",
-          payload: { characterId: id },
-          modelConfig: { ...getModelConfig(), image: resolveImageRef(imageModelRef) },
-        }),
-      });
-      await response.json();
-    } catch (err) {
-      console.error("Character image error:", err);
-      toast.error(t("common.generationFailed"));
-    }
-    setGenerating(false);
-    onUpdate();
+  async function handleSwitchImage() {
+    if (imageHistory.length < 2) return;
+    const nextIndex = currentImageIndex >= 0
+      ? (currentImageIndex + 1) % imageHistory.length
+      : 0;
+    await switchToImage(imageHistory[nextIndex]);
   }
 
   async function handleUploadImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -145,19 +138,8 @@ export function CharacterCard({
           </button>
         )}
         {referenceImage ? (() => {
-          let history: string[] = [];
-          try { history = JSON.parse(referenceImageHistory || "[]"); } catch {}
-          if (history.length === 0 && referenceImage) history = [referenceImage];
-          const currentIdx = history.indexOf(referenceImage);
-          const showArrows = history.length > 1;
-          async function switchTo(newPath: string) {
-            await apiFetch(`/api/projects/${projectId}/characters/${id}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ referenceImage: newPath }),
-            });
-            onUpdate();
-          }
+          const showArrows = imageHistory.length > 1;
+          const currentIdx = currentImageIndex >= 0 ? currentImageIndex : 0;
           return (
             <div className="relative w-full aspect-video overflow-hidden rounded-xl cursor-pointer group" onClick={() => setLightbox(true)}>
               <img
@@ -170,8 +152,8 @@ export function CharacterCard({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const next = (currentIdx - 1 + history.length) % history.length;
-                      switchTo(history[next]);
+                      const next = (currentIdx - 1 + imageHistory.length) % imageHistory.length;
+                      switchToImage(imageHistory[next]);
                     }}
                     className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
                   >
@@ -180,21 +162,21 @@ export function CharacterCard({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const next = (currentIdx + 1) % history.length;
-                      switchTo(history[next]);
+                      const next = (currentIdx + 1) % imageHistory.length;
+                      switchToImage(imageHistory[next]);
                     }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
                   <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white">
-                    {currentIdx + 1}/{history.length}
+                    {currentIdx + 1}/{imageHistory.length}
                   </span>
                 </>
               )}
             </div>
           );
-        })() : isGenerating ? (
+        })() : isLoadingImage ? (
           <div className="w-full aspect-video rounded-xl animate-shimmer" />
         ) : (
           <div className="flex w-full aspect-video items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-accent/10 text-3xl font-bold text-primary">
@@ -255,20 +237,20 @@ export function CharacterCard({
           className="h-8 text-xs text-muted-foreground"
         />
         <div className="space-y-2">
-            <InlineModelPicker capability="image" value={imageModelRef} onChange={setImageModelRef} />
             <div className="flex gap-2">
               <Button
-                onClick={handleGenerateImage}
-                disabled={isGenerating}
+                onClick={handleSwitchImage}
+                disabled={switchingImage || imageHistory.length < 2}
                 className="flex-1"
                 size="sm"
+                title={imageHistory.length < 2 ? t("character.noSwitchableImages") : t("character.switchImage")}
               >
-                {isGenerating ? (
+                {switchingImage ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Images className="h-3.5 w-3.5" />
                 )}
-                {isGenerating ? t("common.generating") : t("character.generateImage")}
+                {switchingImage ? t("common.loading") : t("character.switchImage")}
               </Button>
               <Button
                 variant="outline"
@@ -282,24 +264,6 @@ export function CharacterCard({
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Upload className="h-3.5 w-3.5" />
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 px-2.5"
-                title="Copy image prompt"
-                onClick={async () => {
-                  const prompt = buildCharacterTurnaroundPrompt(editDesc || editName, editName);
-                  await navigator.clipboard.writeText(prompt);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-              >
-                {copied ? (
-                  <Check className="h-3.5 w-3.5 text-green-500" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5" />
                 )}
               </Button>
             </div>

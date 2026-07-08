@@ -28,6 +28,7 @@ const CATEGORIES = [
   { value: "script_outline", labelKey: "scriptOutline" },
   { value: "script_generate", labelKey: "scriptGenerate" },
   { value: "script_parse", labelKey: "scriptParse" },
+  { value: "script_visual_enrichment", labelKey: "scriptVisualEnrichment" },
   { value: "character_extract", labelKey: "characterExtract" },
   { value: "shot_split", labelKey: "shotSplit" },
   { value: "keyframe_prompts", labelKey: "keyframePrompts" },
@@ -149,7 +150,7 @@ export function AgentSection() {
   const isEditing = editingId !== null;
 
   return (
-    <div className="rounded-2xl border border-[--border-subtle] bg-white p-5">
+    <div className="frame-panel rounded-lg p-5">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[--text-muted]">
           <Bot className="h-3.5 w-3.5" />

@@ -110,6 +110,62 @@ export default function EpisodeStoryboardPage() {
     ? _selectedVersionId
     : (versions[0]?.id ?? null);
 
+  async function refreshCurrentStoryboard() {
+    if (!project) return;
+    await fetchProject(project.id, currentEpisodeId || undefined, selectedVersionId || undefined);
+  }
+
+  async function handleDuplicateShot(shotId: string) {
+    if (!project) return;
+    try {
+      const res = await apiFetch(`/api/projects/${project.id}/shots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "duplicate", sourceShotId: shotId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await refreshCurrentStoryboard();
+      toast.success(t("shot.duplicateSuccess"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("common.generationFailed"));
+    }
+  }
+
+  async function handleDeleteShot(shotId: string) {
+    if (!project) return;
+    try {
+      const res = await apiFetch(`/api/projects/${project.id}/shots/${shotId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      if (openDrawerShotId === shotId) setOpenDrawerShotId(null);
+      await refreshCurrentStoryboard();
+      toast.success(t("shot.deleteSuccess"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("common.generationFailed"));
+    }
+  }
+
+  async function handleAddShot() {
+    if (!project) return;
+    try {
+      const res = await apiFetch(`/api/projects/${project.id}/shots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add",
+          episodeId: currentEpisodeId,
+          versionId: selectedVersionId,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await refreshCurrentStoryboard();
+      toast.success(t("shot.addSuccess"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("common.generationFailed"));
+    }
+  }
+
   const sceneGroups = useMemo(() => {
     if (!project) return { groups: [], ungrouped: [] };
 
@@ -823,7 +879,6 @@ export default function EpisodeStoryboardPage() {
           characters={project.characters}
           projectId={project.id}
           generationMode={generationMode}
-          onUpdate={() => fetchProject(project.id, useProjectStore.getState().currentEpisodeId!)}
         />
 
         {/* Batch operations */}
@@ -1130,6 +1185,9 @@ export default function EpisodeStoryboardPage() {
               videoRatio={videoRatio}
               isCompact={openDrawerShotId !== null}
               onOpenDrawer={(id) => setOpenDrawerShotId(id)}
+              onDuplicate={handleDuplicateShot}
+              onDelete={handleDeleteShot}
+              onAdd={handleAddShot}
               batchGeneratingFrames={generationMode === "reference" ? generatingSceneFrames : generatingFrames}
               batchGeneratingVideoPrompts={generatingVideoPrompts}
               batchGeneratingVideos={generatingVideos}

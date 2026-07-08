@@ -40,10 +40,10 @@ export function LogoIcon({ className, size = 20 }: LogoIconProps) {
 export function LogoFull({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[--primary] text-white">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[--brand-cyan] via-[--brand-blue] to-[--brand-violet] text-white shadow-[0_0_22px_rgba(47,107,255,0.35)]">
         <LogoIcon size={18} />
       </div>
-      <span className="font-display text-[15px] font-bold tracking-tight text-[#1A1A1A]">
+      <span className="frame-gradient-text font-display text-[15px] font-extrabold tracking-tight">
         AI Comic Builder
       </span>
     </div>

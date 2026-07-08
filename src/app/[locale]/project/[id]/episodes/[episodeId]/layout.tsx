@@ -31,9 +31,9 @@ export default function EpisodeLayout({
   }
 
   return (
-    <div className="flex flex-1">
+    <div className="flex flex-1 bg-frame-grid">
       <ProjectNav projectId={id} episodeId={episodeId} />
-      <main className="flex-1 bg-[--surface] p-6 pb-24 lg:pb-6 min-w-0">
+      <main className="flex-1 bg-transparent p-6 pb-24 lg:pb-6 min-w-0">
         {children}
       </main>
     </div>

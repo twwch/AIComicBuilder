@@ -18,6 +18,13 @@ export const MODEL_MAX_DURATIONS: Record<string, number> = {
   "wan2.6-i2v": 10,
   "wan2.6-r2v": 10,
   "wan2.6-r2v-flash": 10,
+  "viduq3-pro": 16,
+  "viduq3-turbo": 16,
+  "viduq3": 16,
+  "kling-video": 15,
+  "kling-3.0-turbo": 15,
+  "minimax-hailuo-02": 10,
+  "minimax-hailuo-2.3": 10,
 };
 
 /** Family-level fallback: if modelId contains this substring, use this duration */
@@ -30,6 +37,10 @@ const FAMILY_MAX_DURATIONS: [string, number][] = [
   ["wan2.7", 15],
   ["wan2.6", 15],
   ["wan", 15],
+  ["viduq3", 16],
+  ["vidu", 16],
+  ["hailuo", 10],
+  ["pixverse", 10],
 ];
 
 export const DEFAULT_MAX_DURATION = 12;

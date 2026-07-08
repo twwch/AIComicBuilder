@@ -1,16 +1,16 @@
 /**
- * Convert a local file path (e.g., "./uploads/frames/abc.png") to an API URL
- * for serving via /api/uploads/[...path].
+ * Convert local upload file paths to /api/uploads URLs, while preserving
+ * public/static URLs that Next.js serves directly from /public.
  */
 export function uploadUrl(filePath: string): string {
-  // Normalize backslashes to forward slashes (Windows compatibility)
   const normalized = filePath.replace(/\\/g, "/");
 
-  // Already an API URL — return as-is
+  if (!normalized) return normalized;
+  if (/^(https?:|data:|blob:)/i.test(normalized)) return normalized;
+  if (normalized.startsWith("/generated/")) return normalized;
+  if (normalized.startsWith("/templates/")) return normalized;
   if (normalized.startsWith("/api/uploads/")) return normalized;
 
-  // Strip any prefix ending with "uploads/" (handles ./uploads/, /abs/path/uploads/, etc.)
   const stripped = normalized.replace(/^.*?uploads\//, "");
-
   return `/api/uploads/${stripped}`;
 }

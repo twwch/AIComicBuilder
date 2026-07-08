@@ -30,8 +30,8 @@ import {
   Clock,
   Sparkles,
   Copy,
-  Check,
   RefreshCw,
+  MoreHorizontal,
   ChevronDown,
   ChevronUp,
   ChevronLeft,
@@ -100,6 +100,9 @@ interface ShotCardProps {
   videoRatio?: string;
   isCompact?: boolean;
   onOpenDrawer?: (id: string) => void;
+  onDuplicate?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onAdd?: () => void;
   batchGeneratingFrames?: boolean;
   batchGeneratingVideoPrompts?: boolean;
   batchGeneratingVideos?: boolean;
@@ -122,18 +125,28 @@ function StepRow({
   children,
   defaultOpen = false,
   isNext = false,
+  hideHeader = false,
 }: {
   label: string;
   state: StepState;
   children: React.ReactNode;
   defaultOpen?: boolean;
   isNext?: boolean;
+  hideHeader?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen || isNext);
 
   useEffect(() => {
     if (isNext) setOpen(true);
   }, [isNext]);
+
+  if (hideHeader) {
+    return (
+      <div className="rounded-xl border border-[--border-subtle] bg-[--surface]/50 px-3 py-3">
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className={`rounded-xl border transition-colors ${
@@ -178,6 +191,9 @@ export function ShotCard({
   videoRatio = "16:9",
   isCompact = false,
   onOpenDrawer,
+  onDuplicate,
+  onDelete,
+  onAdd,
   batchGeneratingFrames = false,
   batchGeneratingVideoPrompts = false,
   batchGeneratingVideos = false,
@@ -242,13 +258,25 @@ export function ShotCard({
 
   // UI state
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const uploadFieldRef = useRef<string | null>(null);
 
   const imageGuard = useModelGuard("image");
   const videoGuard = useModelGuard("video");
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(e.target as Node)) {
+        setActionsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [actionsOpen]);
 
   // Build legacy-shape RefImage[] from the unified shot.assets[] (null-safe)
   // Build legacy-shape RefImage[] from the unified shot.assets[] (null-safe).
@@ -719,13 +747,6 @@ export function ShotCard({
     setUploadingField(null);
   }
 
-  function handleCopyPrompt() {
-    const text = videoPrompt || `${videoScript || motionScript || prompt}\nCamera: ${cameraDirection}`;
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   const frameAssets = generationMode === "reference"
     ? [{ src: sceneRefFrame, label: t("shot.sceneRefFrame"), type: "image" as const }]
     : [
@@ -920,14 +941,58 @@ export function ShotCard({
         </div>
 
         {/* Right actions */}
-        <div className="flex items-center gap-1.5">
+        <div ref={actionsMenuRef} className="relative flex items-center gap-1.5">
           <button
-            onClick={handleCopyPrompt}
-            title={t("shot.copyPrompt")}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActionsOpen((open) => !open);
+            }}
+            title={t("shot.actions")}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-[--text-muted] transition-colors hover:bg-[--surface] hover:text-[--text-primary]"
           >
-            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+            <MoreHorizontal className="h-4 w-4" />
           </button>
+          {actionsOpen && (
+            <div className="absolute right-0 top-full z-30 mt-1 min-w-[132px] overflow-hidden rounded-xl border border-[--border-subtle] bg-white py-1 shadow-lg">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActionsOpen(false);
+                  onDuplicate?.(id);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[--text-secondary] transition-colors hover:bg-[--surface] hover:text-[--text-primary]"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                {t("shot.duplicateShot")}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActionsOpen(false);
+                  onDelete?.(id);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {t("shot.deleteShot")}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActionsOpen(false);
+                  onAdd?.();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[--text-secondary] transition-colors hover:bg-[--surface] hover:text-[--text-primary]"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {t("shot.addShot")}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1006,6 +1071,7 @@ export function ShotCard({
           label={generationMode === "reference" ? t("shot.stepSceneFrame") : t("shot.stepFrames")}
           state={frameState}
           isNext={nextStep === "frame"}
+          hideHeader
         >
           {/* Frame thumbnails */}
           {generationMode === "reference" ? (
@@ -1356,6 +1422,7 @@ export function ShotCard({
           label={t("shot.stepVideoPrompt")}
           state={promptState}
           isNext={nextStep === "prompt"}
+          hideHeader
         >
           {hasVideoPrompt && (
             <div className="mb-2">
@@ -1394,6 +1461,7 @@ export function ShotCard({
           label={t("shot.stepVideo")}
           state={videoState}
           isNext={nextStep === "video"}
+          hideHeader
         >
           {hasVideo && (() => {
             const videoTypeKey = generationMode === "reference" ? "ref_video" : "video";

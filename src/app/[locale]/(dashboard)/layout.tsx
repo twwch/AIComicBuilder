@@ -12,13 +12,13 @@ export default async function DashboardLayout({
   const t = await getTranslations("common");
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-30 flex h-14 flex-shrink-0 items-center justify-between border-b border-[--border-subtle] bg-white/80 backdrop-blur-xl px-4 lg:px-6">
+    <div className="flex min-h-screen flex-col bg-frame-grid">
+      <header className="sticky top-0 z-30 flex h-14 flex-shrink-0 items-center justify-between border-b border-[--border-subtle] bg-[#070A10]/88 px-4 backdrop-blur-xl lg:px-6">
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[--primary]/10 text-[--primary]">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-[--brand-cyan] via-[--brand-blue] to-[--brand-violet] text-white shadow-[0_0_18px_rgba(47,107,255,0.35)]">
             <LogoIcon size={14} />
           </div>
-          <span className="font-display text-sm font-semibold text-[--text-primary]">
+          <span className="frame-gradient-text font-display text-sm font-extrabold">
             {t("appName")}
           </span>
         </Link>
@@ -39,7 +39,7 @@ export default async function DashboardLayout({
           <LanguageSwitcher />
         </div>
       </header>
-      <main className="flex-1 bg-[--surface] p-6 lg:p-8">{children}</main>
+      <main className="flex-1 bg-transparent p-6 lg:p-8">{children}</main>
     </div>
   );
 }

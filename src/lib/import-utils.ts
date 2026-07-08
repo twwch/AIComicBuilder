@@ -22,15 +22,15 @@ export async function addImportLog(
 export const CHUNK_SIZE = 10000;
 
 /** Split text at paragraph boundaries, each chunk ≤ CHUNK_SIZE chars */
-export function chunkText(text: string): string[] {
-  if (text.length <= CHUNK_SIZE) return [text];
+export function chunkText(text: string, size = CHUNK_SIZE): string[] {
+  if (text.length <= size) return [text];
 
   const paragraphs = text.split(/\n{2,}/);
   const chunks: string[] = [];
   let current = "";
 
   for (const para of paragraphs) {
-    if (current.length + para.length + 2 > CHUNK_SIZE && current.length > 0) {
+    if (current.length + para.length + 2 > size && current.length > 0) {
       chunks.push(current.trim());
       current = "";
     }

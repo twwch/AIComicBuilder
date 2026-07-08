@@ -7,7 +7,7 @@ import { CharacterCard } from "@/components/editor/character-card";
 import { CharacterRelations } from "@/components/editor/character-relations";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
-import { Users, Sparkles, ImageIcon, Loader2 } from "lucide-react";
+import { Users, Sparkles, Loader2 } from "lucide-react";
 import { InlineModelPicker } from "@/components/editor/model-selector";
 import { apiFetch } from "@/lib/api-fetch";
 import { useModelGuard } from "@/hooks/use-model-guard";
@@ -20,15 +20,9 @@ export default function EpisodeCharactersPage() {
   const { project, fetchProject } = useProjectStore();
   const getModelConfig = useModelStore((s) => s.getModelConfig);
   const [extracting, setExtracting] = useState(false);
-  const [generatingImages, setGeneratingImages] = useState(false);
   const textGuard = useModelGuard("text");
-  const imageGuard = useModelGuard("image");
 
   if (!project) return null;
-
-  const hasCharactersWithoutImages = project.characters.some(
-    (c) => !c.referenceImage
-  );
 
   async function handleExtractCharacters() {
     if (!project) return;
@@ -57,35 +51,6 @@ export default function EpisodeCharactersPage() {
     }
 
     setExtracting(false);
-    fetchProject(project.id, useProjectStore.getState().currentEpisodeId!);
-  }
-
-  async function handleBatchGenerateImages() {
-    if (!project) return;
-    if (!imageGuard()) return;
-    setGeneratingImages(true);
-
-    try {
-      const response = await apiFetch(`/api/projects/${project.id}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "batch_character_image",
-          modelConfig: getModelConfig(),
-          episodeId: useProjectStore.getState().currentEpisodeId,
-        }),
-      });
-
-      const data = await response.json() as { results: Array<{ status: string }> };
-      if (data.results?.some((r) => r.status === "error")) {
-        toast.warning(t("common.batchPartialFailed"));
-      }
-    } catch (err) {
-      console.error("Batch character image error:", err);
-      toast.error(t("common.generationFailed"));
-    }
-
-    setGeneratingImages(false);
     fetchProject(project.id, useProjectStore.getState().currentEpisodeId!);
   }
 
@@ -121,26 +86,6 @@ export default function EpisodeCharactersPage() {
             )}
             {extracting ? t("common.generating") : t("project.extractCharacters")}
           </Button>
-          {project.characters.length > 0 && hasCharactersWithoutImages && (
-            <>
-              <InlineModelPicker capability="image" />
-              <Button
-                onClick={handleBatchGenerateImages}
-                disabled={generatingImages}
-                variant="default"
-                size="sm"
-              >
-                {generatingImages ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ImageIcon className="h-3.5 w-3.5" />
-                )}
-                {generatingImages
-                  ? t("common.generating")
-                  : t("character.batchGenerateImages")}
-              </Button>
-            </>
-          )}
           <PromptEditButton promptKeys="character_extract" projectId={project.id} />
         </div>
       </div>
@@ -179,7 +124,6 @@ export default function EpisodeCharactersPage() {
               referenceImage={char.referenceImage}
               referenceImageHistory={char.referenceImageHistory}
               onUpdate={() => fetchProject(project.id, useProjectStore.getState().currentEpisodeId!)}
-              batchGenerating={generatingImages}
               scope={char.scope}
               onPromote={
                 char.scope === "guest"

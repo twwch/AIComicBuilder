@@ -376,7 +376,7 @@ function extractJSON(text: string): string {
 
 // ── Schema 校验 ─────────────────────────────────────────────────────
 
-export type AgentCategory = "script_outline" | "script_generate" | "script_parse" | "character_extract" | "shot_split" | "keyframe_prompts" | "video_prompts" | "ref_image_prompts" | "ref_video_prompts";
+export type AgentCategory = "script_outline" | "script_generate" | "script_parse" | "script_visual_enrichment" | "character_extract" | "shot_split" | "keyframe_prompts" | "video_prompts" | "ref_image_prompts" | "ref_video_prompts";
 
 export function validateAgentOutput(category: AgentCategory, rawText: string): unknown {
   const jsonStr = extractJSON(rawText);
@@ -399,6 +399,8 @@ export function validateAgentOutput(category: AgentCategory, rawText: string): u
       return validateScriptOutline(parsed);
     case "script_parse":
       return validateScriptParse(parsed);
+    case "script_visual_enrichment":
+      return validateScriptVisualEnrichment(parsed);
     case "character_extract":
       return validateCharacterExtract(parsed);
     case "shot_split":
@@ -446,6 +448,20 @@ function validateScriptParse(parsed: unknown): unknown {
     assertField(s, "sceneNumber", "number", `script_parse.scenes[${i}]`);
     assertField(s, "setting", "string", `script_parse.scenes[${i}]`);
     assertField(s, "description", "string", `script_parse.scenes[${i}]`);
+  }
+  return parsed;
+}
+
+function validateScriptVisualEnrichment(parsed: unknown): unknown {
+  const obj = parsed as Record<string, unknown>;
+  assertField(obj, "patches", "array", "script_visual_enrichment");
+  const patches = obj.patches as Array<Record<string, unknown>>;
+  for (let i = 0; i < patches.length; i++) {
+    assertField(patches[i], "scene_id", "string", `patches[${i}]`);
+    assertField(patches[i], "beat_id", "string", `patches[${i}]`);
+    assertField(patches[i], "original_text", "string", `patches[${i}]`);
+    assertField(patches[i], "enriched_text", "string", `patches[${i}]`);
+    assertField(patches[i], "asset_candidates", "array", `patches[${i}]`);
   }
   return parsed;
 }

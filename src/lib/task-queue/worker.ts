@@ -1,10 +1,17 @@
-import { dequeueTask, completeTask, failTask } from "./queue";
+import { dequeueTask, completeTask, failTask, recoverRunningTasks } from "./queue";
 import type { TaskHandlerMap, Task } from "./types";
 
 const POLL_INTERVAL_MS = 2000;
 
 let isRunning = false;
+let activeCount = 0;
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let handlers: TaskHandlerMap = {};
+
+function getWorkerConcurrency() {
+  const parsed = Number.parseInt(process.env.TASK_WORKER_CONCURRENCY ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 4;
+}
 
 export function registerHandlers(newHandlers: TaskHandlerMap) {
   handlers = { ...handlers, ...newHandlers };
@@ -30,27 +37,60 @@ async function poll() {
   if (!isRunning) return;
 
   try {
-    const task = await dequeueTask();
-    if (task) {
-      await processTask(task);
+    const concurrency = getWorkerConcurrency();
+
+    while (isRunning && activeCount < concurrency) {
+      const task = await dequeueTask();
+      if (!task) break;
+
+      activeCount += 1;
+      void processTask(task)
+        .catch((err) => {
+          console.error("[TaskWorker] Process error:", err);
+        })
+        .finally(() => {
+          activeCount = Math.max(0, activeCount - 1);
+          if (isRunning) schedulePoll(0);
+        });
     }
   } catch (err) {
     console.error("[TaskWorker] Poll error:", err);
   }
 
-  if (isRunning) {
-    setTimeout(poll, POLL_INTERVAL_MS);
-  }
+  if (isRunning) schedulePoll(POLL_INTERVAL_MS);
+}
+
+function schedulePoll(delayMs: number) {
+  if (pollTimer) return;
+  pollTimer = setTimeout(() => {
+    pollTimer = null;
+    poll();
+  }, delayMs);
 }
 
 export function startWorker() {
   if (isRunning) return;
   isRunning = true;
-  console.log("[TaskWorker] Started polling every", POLL_INTERVAL_MS, "ms");
-  poll();
+  console.log(
+    "[TaskWorker] Started polling every",
+    POLL_INTERVAL_MS,
+    "ms with concurrency",
+    getWorkerConcurrency(),
+  );
+  void recoverRunningTasks()
+    .catch((err) => {
+      console.error("[TaskWorker] Recover running tasks error:", err);
+    })
+    .finally(() => {
+      poll();
+    });
 }
 
 export function stopWorker() {
   isRunning = false;
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
   console.log("[TaskWorker] Stopped");
 }

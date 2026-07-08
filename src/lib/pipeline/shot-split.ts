@@ -7,6 +7,7 @@ import { resolvePrompt } from "@/lib/ai/prompts/resolver";
 import { eq, and, or, isNull } from "drizzle-orm";
 import { id as genId } from "@/lib/id";
 import type { Task } from "@/lib/task-queue";
+import { getProductionBiblePromptBlock } from "@/lib/production-bible";
 
 export async function handleShotSplit(task: Task) {
   const payload = task.payload as {
@@ -64,6 +65,7 @@ export async function handleShotSplit(task: Task) {
   if (!colorPalette) {
     if (project?.colorPalette) colorPalette = project.colorPalette;
   }
+  const productionBibleContext = await getProductionBiblePromptBlock(payload.projectId, payload.episodeId);
 
   const systemPrompt = await resolvePrompt("shot_split", {
     userId: payload.userId ?? "",
@@ -77,8 +79,10 @@ export async function handleShotSplit(task: Task) {
 
   let userPrompt = buildShotSplitPrompt(payload.screenplay, characterDescriptions, undefined, colorPalette || undefined, performanceStyles.length > 0 ? performanceStyles : undefined) + relationsText;
 
-  // Inject world setting
-  if (project?.worldSetting) {
+  // Inject production bible / world setting
+  if (productionBibleContext) {
+    userPrompt = `${productionBibleContext}\n\n${userPrompt}`;
+  } else if (project?.worldSetting) {
     userPrompt = `【World Setting】\n${project.worldSetting}\n\nAll shots must be consistent with this world setting.\n\n` + userPrompt;
   }
 

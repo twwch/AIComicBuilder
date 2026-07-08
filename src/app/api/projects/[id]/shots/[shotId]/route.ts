@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { shots } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { assertProjectOwnership } from "@/lib/assert-project-ownership";
 
 async function assertShotInProject(shotId: string, projectId: string) {
@@ -39,6 +39,7 @@ export async function PATCH(
     cameraDirection: string;
     transitionIn: string;
     transitionOut: string;
+    sceneId: string | null;
     compositionGuide: string;
     focalPoint: string;
     depthOfField: string;
@@ -58,6 +59,7 @@ export async function PATCH(
     "cameraDirection",
     "transitionIn",
     "transitionOut",
+    "sceneId",
     "compositionGuide",
     "focalPoint",
     "depthOfField",
@@ -91,9 +93,25 @@ export async function DELETE(
   if (!(await assertProjectOwnership(request, projectId))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (!(await assertShotInProject(shotId, projectId))) {
+  const [target] = await db
+    .select()
+    .from(shots)
+    .where(and(eq(shots.id, shotId), eq(shots.projectId, projectId)));
+  if (!target) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   await db.delete(shots).where(eq(shots.id, shotId));
+  const scope = [
+    eq(shots.projectId, projectId),
+    gt(shots.sequence, target.sequence),
+  ];
+  if (target.episodeId) scope.push(eq(shots.episodeId, target.episodeId));
+  else scope.push(isNull(shots.episodeId));
+  if (target.versionId) scope.push(eq(shots.versionId, target.versionId));
+  else scope.push(isNull(shots.versionId));
+  await db
+    .update(shots)
+    .set({ sequence: sql`${shots.sequence} - 1` })
+    .where(and(...scope));
   return new NextResponse(null, { status: 204 });
 }

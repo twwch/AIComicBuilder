@@ -3,24 +3,22 @@ import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import {
-  Playfair_Display,
-  Karla,
+  Inter,
   JetBrains_Mono,
 } from "next/font/google";
 import "../globals.css";
 import { FingerprintProvider } from "@/components/fingerprint-provider";
 import { Toaster } from "sonner";
 
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-const karla = Karla({
+const interSans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
+  display: "swap",
+});
+
+const interDisplay = Inter({
+  subsets: ["latin"],
+  variable: "--font-display",
   display: "swap",
 });
 
@@ -48,7 +46,7 @@ export default async function LocaleLayout({
   return (
     <html
       lang={locale}
-      className={`dark ${playfair.variable} ${karla.variable} ${jetbrains.variable}`}
+      className={`dark ${interSans.variable} ${interDisplay.variable} ${jetbrains.variable}`}
       suppressHydrationWarning
     >
       <body
