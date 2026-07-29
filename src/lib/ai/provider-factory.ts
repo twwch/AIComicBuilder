@@ -27,6 +27,7 @@ export interface ModelConfigPayload {
 export function createAIProvider(config: ProviderConfig, uploadDir?: string): AIProvider {
   switch (config.protocol) {
     case "openai":
+    case "atlascloud":
       return new OpenAIProvider({
         apiKey: config.apiKey,
         baseURL: config.baseUrl,

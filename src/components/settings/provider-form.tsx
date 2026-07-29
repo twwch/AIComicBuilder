@@ -15,6 +15,7 @@ import { Loader2, Download, Plus, Eye, EyeOff, Trash2, Search } from "lucide-rea
 
 const DEFAULT_BASE_URLS: Record<Protocol, string> = {
   openai: "https://api.openai.com",
+  atlascloud: "https://api.atlascloud.ai/v1",
   gemini: "https://generativelanguage.googleapis.com",
   seedance: "https://ark.cn-beijing.volces.com",
   "ucloud-seedance": "https://api.modelverse.cn",
@@ -27,6 +28,7 @@ function getProtocolOptions(capability: Capability): { value: Protocol; label: s
   if (capability === "text") {
     return [
       { value: "openai", label: "OpenAI" },
+      { value: "atlascloud", label: "Atlas Cloud" },
       { value: "gemini", label: "Gemini" },
     ];
   }
