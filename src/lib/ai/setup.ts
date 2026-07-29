@@ -5,6 +5,11 @@ import { SeedanceProvider } from "./providers/seedance";
 
 let initialized = false;
 
+const ATLASCLOUD_BASE_URL =
+  process.env.ATLASCLOUD_BASE_URL || "https://api.atlascloud.ai/v1";
+const ATLASCLOUD_MODEL =
+  process.env.ATLASCLOUD_MODEL || "deepseek-ai/deepseek-v4-pro";
+
 export function initializeProviders() {
   if (initialized) return;
 
@@ -17,6 +22,21 @@ export function initializeProviders() {
     setDefaultAIProvider(
       new GeminiProvider(),
       (uploadDir) => new GeminiProvider({ ...(uploadDir && { uploadDir }) }),
+    );
+  } else if (process.env.ATLASCLOUD_API_KEY) {
+    setDefaultAIProvider(
+      new OpenAIProvider({
+        apiKey: process.env.ATLASCLOUD_API_KEY,
+        baseURL: ATLASCLOUD_BASE_URL,
+        model: ATLASCLOUD_MODEL,
+      }),
+      (uploadDir) =>
+        new OpenAIProvider({
+          apiKey: process.env.ATLASCLOUD_API_KEY,
+          baseURL: ATLASCLOUD_BASE_URL,
+          model: ATLASCLOUD_MODEL,
+          ...(uploadDir && { uploadDir }),
+        }),
     );
   }
 
